@@ -70,6 +70,8 @@ import io.github.fallasleeptimetable.data.calendar.CalendarScheduleExporter
 import io.github.fallasleeptimetable.data.diagnostics.ImportLog
 import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.ui.ScheduleUiState
+import io.github.fallasleeptimetable.widget.WidgetThemeSetting
+import io.github.fallasleeptimetable.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -100,6 +102,7 @@ fun SettingsScreen(
     var showTermDialog by remember { mutableStateOf(false) }
     var showClassTimeDialog by remember { mutableStateOf(false) }
     var showThemeColorDialog by remember { mutableStateOf(false) }
+    var showWidgetThemeDialog by remember { mutableStateOf(false) }
     var termMenuOpen by remember { mutableStateOf(false) }
     var showCreateTimetable by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<TimetableEntity?>(null) }
@@ -111,6 +114,14 @@ fun SettingsScreen(
     var deleteAllCalendarConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var widgetTheme by remember { mutableStateOf(WidgetThemeSetting.get(context)) }
+
+    fun applyWidgetTheme(value: String) {
+        WidgetThemeSetting.set(context, value)
+        widgetTheme = value
+        WidgetUpdater.updateAll(context)
+        showWidgetThemeDialog = false
+    }
 
     fun runCalendarExport() {
         if (calendarBusy) return
@@ -358,6 +369,23 @@ fun SettingsScreen(
                         )
                     },
                     modifier = Modifier.clickable { showThemeColorDialog = true },
+                )
+            }
+            item { HorizontalDivider() }
+
+            item { SectionHeader("小组件") }
+            item {
+                ListItem(
+                    headlineContent = { Text("小组件样式") },
+                    supportingContent = { Text("深色 / 浅色 / 跟随系统") },
+                    leadingContent = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_palette),
+                            contentDescription = null,
+                        )
+                    },
+                    trailingContent = { Text(WidgetThemeSetting.label(widgetTheme)) },
+                    modifier = Modifier.clickable { showWidgetThemeDialog = true },
                 )
             }
             item { HorizontalDivider() }
@@ -704,6 +732,38 @@ fun SettingsScreen(
                 TextButton(onClick = { deleteAllCalendarConfirm = false }) {
                     Text("取消")
                 }
+            },
+        )
+    }
+
+    if (showWidgetThemeDialog) {
+        AlertDialog(
+            onDismissRequest = { showWidgetThemeDialog = false },
+            title = { Text("小组件样式") },
+            text = {
+                Column {
+                    listOf(
+                        WidgetThemeSetting.SYSTEM to "跟随系统",
+                        WidgetThemeSetting.LIGHT to "浅色",
+                        WidgetThemeSetting.DARK to "深色",
+                    ).forEach { (value, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { applyWidgetTheme(value) },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = widgetTheme == value,
+                                onClick = { applyWidgetTheme(value) },
+                            )
+                            Text(label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWidgetThemeDialog = false }) { Text("关闭") }
             },
         )
     }

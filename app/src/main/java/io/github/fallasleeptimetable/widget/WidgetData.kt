@@ -87,6 +87,6 @@ object WidgetWeekState {
         context.getSharedPreferences("settings", Context.MODE_PRIVATE)
             .edit()
             .putInt(KEY, value)
-            .apply()
+            .commit()
     }
 }

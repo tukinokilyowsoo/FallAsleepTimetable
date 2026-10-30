@@ -5,16 +5,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.Button
+import androidx.glance.ButtonDefaults
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
-import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.updateAll
 import androidx.glance.background
@@ -94,6 +96,7 @@ private fun WeekScheduleContent(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(ColorProvider(palette.background))
+            .cornerRadius(20.dp)
             .padding(8.dp),
     ) {
         if (data == null) {
@@ -119,15 +122,17 @@ private fun WeekScheduleContent(
                 modifier = GlanceModifier.fillMaxWidth(),
                 verticalAlignment = androidx.glance.layout.Alignment.CenterVertically,
             ) {
-                Text(
+                Button(
                     text = "‹",
-                    modifier = GlanceModifier
-                        .clickable(actionRunCallback<WeekPrevAction>())
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    onClick = actionRunCallback<WeekPrevAction>(),
                     style = TextStyle(
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Medium,
                         color = ColorProvider(palette.text),
+                    ),
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = ColorProvider(palette.surface),
+                        contentColor = ColorProvider(palette.text),
                     ),
                 )
                 Text(
@@ -141,15 +146,17 @@ private fun WeekScheduleContent(
                     ),
                     maxLines = 1,
                 )
-                Text(
+                Button(
                     text = "›",
-                    modifier = GlanceModifier
-                        .clickable(actionRunCallback<WeekNextAction>())
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    onClick = actionRunCallback<WeekNextAction>(),
                     style = TextStyle(
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Medium,
                         color = ColorProvider(palette.text),
+                    ),
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = ColorProvider(palette.surface),
+                        contentColor = ColorProvider(palette.text),
                     ),
                 )
             }
@@ -230,6 +237,7 @@ private fun WeekScheduleContent(
                                                         palette.containers[colorIndex],
                                                     ),
                                                 )
+                                                .cornerRadius(6.dp)
                                                 .padding(2.dp),
                                         ) {
                                             Text(
