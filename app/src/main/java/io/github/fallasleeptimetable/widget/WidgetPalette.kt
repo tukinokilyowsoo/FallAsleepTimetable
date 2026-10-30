@@ -2,17 +2,18 @@ package io.github.fallasleeptimetable.widget
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.compose.ui.graphics.Color
 
 data class WidgetPalette(
-    val background: Int,
-    val surface: Int,
-    val text: Int,
-    val secondaryText: Int,
-    val outline: Int,
-    val containers: List<Int>,
-    val onContainers: List<Int>,
-    val mutedContainer: Int,
-    val mutedText: Int,
+    val background: Color,
+    val surface: Color,
+    val text: Color,
+    val secondaryText: Color,
+    val outline: Color,
+    val containers: List<Color>,
+    val onContainers: List<Color>,
+    val mutedContainer: Color,
+    val mutedText: Color,
 )
 
 fun widgetPalette(context: Context): WidgetPalette {
@@ -21,55 +22,55 @@ fun widgetPalette(context: Context): WidgetPalette {
 
     return if (!dark) {
         WidgetPalette(
-            background = 0xFFFFFBFE.toInt(),
-            surface = 0xFFF3EDF7.toInt(),
-            text = 0xFF1B1B21.toInt(),
-            secondaryText = 0xFF45464F.toInt(),
-            outline = 0xFFCAC4D0.toInt(),
+            background = Color(0xFFFFFBFE),
+            surface = Color(0xFFF3EDF7),
+            text = Color(0xFF1B1B21),
+            secondaryText = Color(0xFF45464F),
+            outline = Color(0xFFCAC4D0),
             containers = listOf(
-                0xFFEADDFF.toInt(),
-                0xFFD7E3FF.toInt(),
-                0xFFFFD8E4.toInt(),
-                0xFFFFE0B2.toInt(),
-                0xFFD7E8CC.toInt(),
-                0xFFCFE5F5.toInt(),
+                Color(0xFFEADDFF),
+                Color(0xFFD7E3FF),
+                Color(0xFFFFD8E4),
+                Color(0xFFFFE0B2),
+                Color(0xFFD7E8CC),
+                Color(0xFFCFE5F5),
             ),
             onContainers = listOf(
-                0xFF21005D.toInt(),
-                0xFF001B3D.toInt(),
-                0xFF31111D.toInt(),
-                0xFF2B1700.toInt(),
-                0xFF102010.toInt(),
-                0xFF001E2C.toInt(),
+                Color(0xFF21005D),
+                Color(0xFF001B3D),
+                Color(0xFF31111D),
+                Color(0xFF2B1700),
+                Color(0xFF102010),
+                Color(0xFF001E2C),
             ),
-            mutedContainer = 0xFFE3E3E8.toInt(),
-            mutedText = 0xFF6F7078.toInt(),
+            mutedContainer = Color(0xFFE3E3E8),
+            mutedText = Color(0xFF6F7078),
         )
     } else {
         WidgetPalette(
-            background = 0xFF1B1B21.toInt(),
-            surface = 0xFF26232B.toInt(),
-            text = 0xFFE6E1E9.toInt(),
-            secondaryText = 0xFFC9C5D0.toInt(),
-            outline = 0xFF49454F.toInt(),
+            background = Color(0xFF1B1B21),
+            surface = Color(0xFF26232B),
+            text = Color(0xFFE6E1E9),
+            secondaryText = Color(0xFFC9C5D0),
+            outline = Color(0xFF49454F),
             containers = listOf(
-                0xFF4F378B.toInt(),
-                0xFF2F4677.toInt(),
-                0xFF633B48.toInt(),
-                0xFF5A3F00.toInt(),
-                0xFF3A4E30.toInt(),
-                0xFF27475A.toInt(),
+                Color(0xFF4F378B),
+                Color(0xFF2F4677),
+                Color(0xFF633B48),
+                Color(0xFF5A3F00),
+                Color(0xFF3A4E30),
+                Color(0xFF27475A),
             ),
             onContainers = listOf(
-                0xFFEADDFF.toInt(),
-                0xFFD7E3FF.toInt(),
-                0xFFFFD8E4.toInt(),
-                0xFFFFE0B2.toInt(),
-                0xFFD7E8CC.toInt(),
-                0xFFCFE5F5.toInt(),
+                Color(0xFFEADDFF),
+                Color(0xFFD7E3FF),
+                Color(0xFFFFD8E4),
+                Color(0xFFFFE0B2),
+                Color(0xFFD7E8CC),
+                Color(0xFFCFE5F5),
             ),
-            mutedContainer = 0xFF34323A.toInt(),
-            mutedText = 0xFF9A98A2.toInt(),
+            mutedContainer = Color(0xFF34323A),
+            mutedText = Color(0xFF9A98A2),
         )
     }
 }
