@@ -22,7 +22,6 @@
 | M4 | 多学期、备份、无障碍、打磨 | 计划中 |
 
 详细环境与验证记录见 [docs/M0-记录.md](docs/M0-记录.md)、[docs/M1-记录.md](docs/M1-记录.md)、[docs/M2-记录.md](docs/M2-记录.md) 与 [docs/M3-记录.md](docs/M3-记录.md)。
-界面沟通用的术语见 [docs/UI术语表.md](docs/UI术语表.md)。
 
 ## 下载 / 测试版
 
