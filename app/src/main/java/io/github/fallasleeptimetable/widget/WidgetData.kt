@@ -76,17 +76,3 @@ object WidgetDataLoader {
     }
 }
 
-object WidgetWeekState {
-    private const val KEY = "widget_week_offset"
-
-    fun offset(context: Context): Int =
-        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .getInt(KEY, 0)
-
-    fun setOffset(context: Context, value: Int) {
-        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .edit()
-            .putInt(KEY, value)
-            .commit()
-    }
-}

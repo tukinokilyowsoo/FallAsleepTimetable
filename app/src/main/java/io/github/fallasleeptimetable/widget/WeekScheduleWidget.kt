@@ -5,20 +5,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.glance.Button
-import androidx.glance.ButtonDefaults
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
-import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.action.ActionCallback
-import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
 import androidx.glance.background
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -52,36 +46,6 @@ class WeekScheduleWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = WeekScheduleWidget()
 }
 
-class WeekPrevAction : ActionCallback {
-    override suspend fun onAction(
-        context: Context,
-        glanceId: GlanceId,
-        parameters: ActionParameters,
-    ) {
-        changeWeek(context, -1)
-    }
-}
-
-class WeekNextAction : ActionCallback {
-    override suspend fun onAction(
-        context: Context,
-        glanceId: GlanceId,
-        parameters: ActionParameters,
-    ) {
-        changeWeek(context, 1)
-    }
-}
-
-private suspend fun changeWeek(context: Context, delta: Int) {
-    val data = WidgetDataLoader.load(context) ?: return
-    val actual = data.actualWeek(LocalDate.now()).coerceIn(1, data.term.totalWeeks)
-    val current = (actual + WidgetWeekState.offset(context))
-        .coerceIn(1, data.term.totalWeeks)
-    val target = (current + delta).coerceIn(1, data.term.totalWeeks)
-    WidgetWeekState.setOffset(context, target - actual)
-    WeekScheduleWidget().updateAll(context)
-}
-
 @Composable
 private fun WeekScheduleContent(
     context: Context,
@@ -109,8 +73,7 @@ private fun WeekScheduleContent(
             )
         } else {
             val actualWeek = data.actualWeek(today).coerceIn(1, data.term.totalWeeks)
-            val week = (actualWeek + WidgetWeekState.offset(context))
-                .coerceIn(1, data.term.totalWeeks)
+            val week = actualWeek
             val sessions = data.sessionsForWeek(week)
             val days = buildList {
                 addAll(1..5)
@@ -118,48 +81,17 @@ private fun WeekScheduleContent(
                 if (data.term.showSunday) add(7)
             }
 
-            Row(
+            Text(
+                text = "第 $week 周",
                 modifier = GlanceModifier.fillMaxWidth(),
-                verticalAlignment = androidx.glance.layout.Alignment.CenterVertically,
-            ) {
-                Button(
-                    text = "‹",
-                    onClick = actionRunCallback<WeekPrevAction>(),
-                    style = TextStyle(
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = ColorProvider(palette.text),
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = ColorProvider(palette.surface),
-                        contentColor = ColorProvider(palette.text),
-                    ),
-                )
-                Text(
-                    text = "第 $week 周",
-                    modifier = GlanceModifier.defaultWeight(),
-                    style = TextStyle(
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = ColorProvider(palette.text),
-                        textAlign = TextAlign.Center,
-                    ),
-                    maxLines = 1,
-                )
-                Button(
-                    text = "›",
-                    onClick = actionRunCallback<WeekNextAction>(),
-                    style = TextStyle(
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = ColorProvider(palette.text),
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = ColorProvider(palette.surface),
-                        contentColor = ColorProvider(palette.text),
-                    ),
-                )
-            }
+                style = TextStyle(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = ColorProvider(palette.text),
+                    textAlign = TextAlign.Center,
+                ),
+                maxLines = 1,
+            )
 
             Row(modifier = GlanceModifier.fillMaxWidth().padding(top = 2.dp)) {
                 Spacer(modifier = GlanceModifier.width(26.dp))
