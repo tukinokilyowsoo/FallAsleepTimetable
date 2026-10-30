@@ -106,13 +106,17 @@ fun SettingsScreen(
     var renameTarget by remember { mutableStateOf<TimetableEntity?>(null) }
     var localMessage by remember { mutableStateOf<String?>(null) }
     var calendarBusy by remember { mutableStateOf(false) }
+    var pendingCalendarAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var deleteCurrentCalendarConfirm by remember { mutableStateOf(false) }
+    var deleteAllCalendarConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     fun runCalendarExport() {
         if (calendarBusy) return
         val term = state.term
-        if (term == null || state.selectedTimetable == null) {
+        val timetable = state.selectedTimetable
+        if (term == null || timetable == null) {
             localMessage = "还没有可导入的课表"
             return
         }
@@ -128,6 +132,7 @@ fun SettingsScreen(
                     CalendarScheduleExporter.export(
                         context = context,
                         term = term,
+                        timetableId = timetable.id,
                         courses = state.courses,
                         timeSlots = state.timeSlots,
                     )
@@ -149,13 +154,83 @@ fun SettingsScreen(
         }
     }
 
+    fun runDeleteCurrentCalendar() {
+        if (calendarBusy) return
+        val timetable = state.selectedTimetable
+        if (timetable == null) {
+            localMessage = "还没有选择课表"
+            return
+        }
+        calendarBusy = true
+        scope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                runCatching {
+                    CalendarScheduleExporter.deleteForTimetable(context, timetable.id)
+                }
+            }
+            calendarBusy = false
+            localMessage = outcome.fold(
+                onSuccess = { count ->
+                    if (count == 0) {
+                        "没有找到当前课表已导入的日程"
+                    } else {
+                        "已删除 $count 个当前课表日程"
+                    }
+                },
+                onFailure = { "删除失败：${it.message ?: "未知错误"}" },
+            )
+        }
+    }
+
+    fun runDeleteAllCalendar() {
+        if (calendarBusy) return
+        calendarBusy = true
+        scope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                runCatching { CalendarScheduleExporter.deleteAll(context) }
+            }
+            calendarBusy = false
+            localMessage = outcome.fold(
+                onSuccess = { count ->
+                    if (count == 0) {
+                        "没有找到已导入的日程"
+                    } else {
+                        "已删除 $count 个已导入日程"
+                    }
+                },
+                onFailure = { "删除失败：${it.message ?: "未知错误"}" },
+            )
+        }
+    }
+
     val calendarPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { grants ->
-        if (grants.values.all { it }) {
-            runCalendarExport()
+        val action = pendingCalendarAction
+        pendingCalendarAction = null
+        if (action != null) {
+            if (grants.values.all { it }) {
+                action()
+            } else {
+                localMessage = "没有日历权限，操作已取消"
+            }
+        }
+    }
+
+    fun withCalendarPermission(action: () -> Unit) {
+        val permissions = arrayOf(
+            Manifest.permission.READ_CALENDAR,
+            Manifest.permission.WRITE_CALENDAR,
+        )
+        val granted = permissions.all { permission ->
+            ContextCompat.checkSelfPermission(context, permission) ==
+                PackageManager.PERMISSION_GRANTED
+        }
+        if (granted) {
+            action()
         } else {
-            localMessage = "没有日历权限，无法导入"
+            pendingCalendarAction = action
+            calendarPermissionLauncher.launch(permissions)
         }
     }
 
@@ -413,19 +488,43 @@ fun SettingsScreen(
                     },
                     leadingContent = { Icon(Icons.Filled.DateRange, contentDescription = null) },
                     modifier = Modifier.clickable(enabled = !calendarBusy) {
-                        val permissions = arrayOf(
-                            Manifest.permission.READ_CALENDAR,
-                            Manifest.permission.WRITE_CALENDAR,
+                        withCalendarPermission { runCalendarExport() }
+                    },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("删除当前课表日程") },
+                    supportingContent = {
+                        Text(
+                            if (calendarBusy) {
+                                "处理中…"
+                            } else {
+                                "只删除当前课表已写入系统日历的事件"
+                            },
                         )
-                        val granted = permissions.all { permission ->
-                            ContextCompat.checkSelfPermission(context, permission) ==
-                                PackageManager.PERMISSION_GRANTED
-                        }
-                        if (granted) {
-                            runCalendarExport()
-                        } else {
-                            calendarPermissionLauncher.launch(permissions)
-                        }
+                    },
+                    leadingContent = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                    modifier = Modifier.clickable(enabled = !calendarBusy) {
+                        deleteCurrentCalendarConfirm = true
+                    },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("删除全部已导入日程") },
+                    supportingContent = {
+                        Text(
+                            if (calendarBusy) {
+                                "处理中…"
+                            } else {
+                                "清空「FallAsleep课程表」日历中的所有事件"
+                            },
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                    modifier = Modifier.clickable(enabled = !calendarBusy) {
+                        deleteAllCalendarConfirm = true
                     },
                 )
             }
@@ -550,6 +649,61 @@ fun SettingsScreen(
             onApply = { argb ->
                 onCustomColorPicked(argb)
                 showThemeColorDialog = false
+            },
+        )
+    }
+
+    if (deleteCurrentCalendarConfirm) {
+        AlertDialog(
+            onDismissRequest = { deleteCurrentCalendarConfirm = false },
+            title = { Text("删除当前课表日程？") },
+            text = {
+                Text(
+                    "将删除「${state.selectedTimetable?.name ?: "当前课表"}」" +
+                        "已导入到系统日历的日程；课表数据不受影响。",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deleteCurrentCalendarConfirm = false
+                        withCalendarPermission { runDeleteCurrentCalendar() }
+                    },
+                ) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteCurrentCalendarConfirm = false }) {
+                    Text("取消")
+                }
+            },
+        )
+    }
+
+    if (deleteAllCalendarConfirm) {
+        AlertDialog(
+            onDismissRequest = { deleteAllCalendarConfirm = false },
+            title = { Text("删除全部已导入日程？") },
+            text = {
+                Text(
+                    "将清空系统日历「FallAsleep课程表」中的所有事件；课表数据不受影响。",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deleteAllCalendarConfirm = false
+                        withCalendarPermission { runDeleteAllCalendar() }
+                    },
+                ) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteAllCalendarConfirm = false }) {
+                    Text("取消")
+                }
             },
         )
     }

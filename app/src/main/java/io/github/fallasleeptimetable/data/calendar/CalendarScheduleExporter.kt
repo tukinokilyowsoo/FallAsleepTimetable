@@ -33,6 +33,7 @@ object CalendarScheduleExporter {
     fun export(
         context: Context,
         term: TermEntity,
+        timetableId: Long,
         courses: List<CourseWithSessions>,
         timeSlots: List<TimeSlotEntity>,
         reminderMinutes: Int = REMINDER_MINUTES,
@@ -106,6 +107,7 @@ object CalendarScheduleExporter {
                     put(CalendarContract.Events.TITLE, entry.course.name)
                     put(CalendarContract.Events.DESCRIPTION, description)
                     put(CalendarContract.Events.EVENT_LOCATION, session.room ?: "")
+                    put(CalendarContract.Events.CUSTOM_APP_URI, appUri(timetableId))
                     put(CalendarContract.Events.DTSTART, startMillis)
                     put(CalendarContract.Events.DTEND, endMillis)
                     put(CalendarContract.Events.EVENT_TIMEZONE, zone.id)
@@ -139,7 +141,30 @@ object CalendarScheduleExporter {
         )
     }
 
-    private fun findOrCreateCalendar(resolver: ContentResolver, zone: ZoneId): Long {
+    fun deleteAll(context: Context): Int {
+        val resolver = context.contentResolver
+        val calendarId = findCalendar(resolver) ?: return 0
+        return deleteEvents(
+            resolver,
+            "${CalendarContract.Events.CALENDAR_ID}=?",
+            arrayOf(calendarId.toString()),
+        )
+    }
+
+    fun deleteForTimetable(context: Context, timetableId: Long): Int {
+        val resolver = context.contentResolver
+        val calendarId = findCalendar(resolver) ?: return 0
+        return deleteEvents(
+            resolver,
+            "${CalendarContract.Events.CALENDAR_ID}=? AND " +
+                "${CalendarContract.Events.CUSTOM_APP_URI}=?",
+            arrayOf(calendarId.toString(), appUri(timetableId)),
+        )
+    }
+
+    private fun appUri(timetableId: Long): String = "fallasleep://timetable/$timetableId"
+
+    private fun findCalendar(resolver: ContentResolver): Long? {
         val projection = arrayOf(CalendarContract.Calendars._ID)
         val selection = "${CalendarContract.Calendars.ACCOUNT_NAME}=? AND " +
             "${CalendarContract.Calendars.ACCOUNT_TYPE}=? AND " +
@@ -157,6 +182,11 @@ object CalendarScheduleExporter {
                 return cursor.getLong(0)
             }
         }
+        return null
+    }
+
+    private fun findOrCreateCalendar(resolver: ContentResolver, zone: ZoneId): Long {
+        findCalendar(resolver)?.let { return it }
 
         val values = ContentValues().apply {
             put(CalendarContract.Calendars.ACCOUNT_NAME, ACCOUNT_NAME)
@@ -180,9 +210,18 @@ object CalendarScheduleExporter {
     }
 
     private fun clearCalendar(resolver: ContentResolver, calendarId: Long) {
-        val selection = "${CalendarContract.Events.CALENDAR_ID}=?"
-        val args = arrayOf(calendarId.toString())
+        deleteEvents(
+            resolver,
+            "${CalendarContract.Events.CALENDAR_ID}=?",
+            arrayOf(calendarId.toString()),
+        )
+    }
 
+    private fun deleteEvents(
+        resolver: ContentResolver,
+        selection: String,
+        args: Array<String>,
+    ): Int {
         val ids = mutableListOf<Long>()
         resolver.query(
             CalendarContract.Events.CONTENT_URI,
@@ -209,6 +248,7 @@ object CalendarScheduleExporter {
             selection,
             args,
         )
+        return ids.size
     }
 
     private fun asSyncAdapter(uri: Uri): Uri = uri.buildUpon()
