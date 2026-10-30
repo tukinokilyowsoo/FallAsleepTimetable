@@ -1,5 +1,7 @@
 package io.github.fallasleeptimetable.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -50,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,12 +62,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import io.github.fallasleeptimetable.BuildConfig
 import io.github.fallasleeptimetable.R
 import io.github.fallasleeptimetable.data.TermEntity
+import io.github.fallasleeptimetable.data.calendar.CalendarScheduleExporter
 import io.github.fallasleeptimetable.data.diagnostics.ImportLog
 import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.ui.ScheduleUiState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -97,7 +105,59 @@ fun SettingsScreen(
     var deleteTarget by remember { mutableStateOf<TimetableEntity?>(null) }
     var renameTarget by remember { mutableStateOf<TimetableEntity?>(null) }
     var localMessage by remember { mutableStateOf<String?>(null) }
+    var calendarBusy by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    fun runCalendarExport() {
+        if (calendarBusy) return
+        val term = state.term
+        if (term == null || state.selectedTimetable == null) {
+            localMessage = "还没有可导入的课表"
+            return
+        }
+        if (state.courses.isEmpty()) {
+            localMessage = "当前课表还没有课程"
+            return
+        }
+
+        calendarBusy = true
+        scope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                runCatching {
+                    CalendarScheduleExporter.export(
+                        context = context,
+                        term = term,
+                        courses = state.courses,
+                        timeSlots = state.timeSlots,
+                    )
+                }
+            }
+            calendarBusy = false
+            localMessage = outcome.fold(
+                onSuccess = { result ->
+                    if (result.eventCount == 0) {
+                        "没有可导入的日程"
+                    } else {
+                        "已导入 ${result.eventCount} 个日程，可在系统日历中启用「${result.calendarDisplayName}」"
+                    }
+                },
+                onFailure = { error ->
+                    "导入失败：${error.message ?: "未知错误"}"
+                },
+            )
+        }
+    }
+
+    val calendarPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        if (grants.values.all { it }) {
+            runCalendarExport()
+        } else {
+            localMessage = "没有日历权限，无法导入"
+        }
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -336,6 +396,36 @@ fun SettingsScreen(
                     leadingContent = { Icon(Icons.Filled.Add, contentDescription = null) },
                     modifier = Modifier.clickable {
                         importLauncher.launch(arrayOf("*/*"))
+                    },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("导入到系统日历") },
+                    supportingContent = {
+                        Text(
+                            if (calendarBusy) {
+                                "正在导入…"
+                            } else {
+                                "当前课表写入系统日历，提前 10 分钟提醒"
+                            },
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+                    modifier = Modifier.clickable(enabled = !calendarBusy) {
+                        val permissions = arrayOf(
+                            Manifest.permission.READ_CALENDAR,
+                            Manifest.permission.WRITE_CALENDAR,
+                        )
+                        val granted = permissions.all { permission ->
+                            ContextCompat.checkSelfPermission(context, permission) ==
+                                PackageManager.PERMISSION_GRANTED
+                        }
+                        if (granted) {
+                            runCalendarExport()
+                        } else {
+                            calendarPermissionLauncher.launch(permissions)
+                        }
                     },
                 )
             }
