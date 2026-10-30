@@ -90,6 +90,8 @@ dependencies {
 
     implementation("org.jsoup:jsoup:1.18.3")
 
+    implementation("androidx.glance:glance-appwidget:1.2.0")
+
     testImplementation("junit:junit:4.13.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

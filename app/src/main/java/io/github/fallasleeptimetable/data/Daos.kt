@@ -27,6 +27,9 @@ interface TermDao {
     @Query("SELECT * FROM term WHERE id = :id")
     suspend fun get(id: Long): TermEntity?
 
+    @Query("SELECT * FROM term ORDER BY id LIMIT 1")
+    suspend fun getFirst(): TermEntity?
+
     @Query("SELECT COUNT(*) FROM term")
     suspend fun count(): Int
 
@@ -66,6 +69,10 @@ interface CourseDao {
     @Transaction
     @Query("SELECT * FROM course WHERE timetableId = :timetableId ORDER BY name")
     fun observeWithSessions(timetableId: Long): Flow<List<CourseWithSessions>>
+
+    @Transaction
+    @Query("SELECT * FROM course WHERE timetableId = :timetableId ORDER BY name")
+    suspend fun getWithSessions(timetableId: Long): List<CourseWithSessions>
 
     @Query("SELECT * FROM course WHERE id = :id")
     suspend fun getCourse(id: Long): CourseEntity?

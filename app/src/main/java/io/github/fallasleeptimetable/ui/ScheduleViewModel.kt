@@ -13,6 +13,7 @@ import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.data.importer.TimetableExporter
 import io.github.fallasleeptimetable.domain.CourseDraft
 import io.github.fallasleeptimetable.domain.weekNumberFor
+import io.github.fallasleeptimetable.widget.WidgetUpdater
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,6 +49,7 @@ private data class BaseState(
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = AppContainer.repository(application)
+    private val appContext = application.applicationContext
     private val prefs = application.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     private val selectedId = MutableStateFlow(
@@ -119,6 +121,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                 .onSuccess { result ->
                     selectTimetable(result.timetableId)
                     _message.value = "已导入 ${result.courseCount} 门课程"
+                    WidgetUpdater.updateAll(appContext)
                 }
                 .onFailure { error ->
                     _message.value = "导入失败：${error.message ?: "文件格式不支持"}"
@@ -133,6 +136,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             if (selectedId.value == null || tables.none { it.id == selectedId.value }) {
                 selectedId.value = tables.firstOrNull()?.id
             }
+            WidgetUpdater.updateAll(appContext)
         }
     }
 
@@ -160,11 +164,15 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         val table = uiState.value.selectedTimetable ?: return
         viewModelScope.launch {
             repository.saveCourse(table.id, courseId, sessionId, draft)
+            WidgetUpdater.updateAll(appContext)
         }
     }
 
     fun deleteCourse(courseId: Long) {
-        viewModelScope.launch { repository.deleteCourse(courseId) }
+        viewModelScope.launch {
+            repository.deleteCourse(courseId)
+            WidgetUpdater.updateAll(appContext)
+        }
     }
 
     fun createTimetable(name: String) {
@@ -172,11 +180,15 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val id = repository.createTimetable(term.id, name)
             selectTimetable(id)
+            WidgetUpdater.updateAll(appContext)
         }
     }
 
     fun renameTimetable(id: Long, name: String) {
-        viewModelScope.launch { repository.renameTimetable(id, name) }
+        viewModelScope.launch {
+            repository.renameTimetable(id, name)
+            WidgetUpdater.updateAll(appContext)
+        }
     }
 
     fun deleteTimetable(id: Long) {
@@ -190,6 +202,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             } else {
                 prefs.edit().remove(KEY_SELECTED_TIMETABLE).apply()
             }
+            WidgetUpdater.updateAll(appContext)
         }
     }
 
@@ -197,6 +210,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repository.updateTerm(term)
             weekOverride.value = null
+            WidgetUpdater.updateAll(appContext)
         }
     }
 
@@ -204,6 +218,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         val term = uiState.value.term ?: return
         viewModelScope.launch {
             repository.replaceTimeSlots(term.id, periodsPerDay, slots)
+            WidgetUpdater.updateAll(appContext)
         }
     }
 

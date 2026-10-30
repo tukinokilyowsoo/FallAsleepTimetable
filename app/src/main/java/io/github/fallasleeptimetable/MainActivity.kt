@@ -13,8 +13,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import io.github.fallasleeptimetable.ui.FallAsleepApp
 import io.github.fallasleeptimetable.ui.theme.FallAsleepTheme
+import io.github.fallasleeptimetable.widget.WidgetUpdater
 
 class MainActivity : ComponentActivity() {
+    override fun onStart() {
+        super.onStart()
+        WidgetUpdater.updateAll(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
