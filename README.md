@@ -49,7 +49,8 @@ app/src/main/java/io/github/fallasleeptimetable/
 
 | 平板（expanded） | 手机（compact） |
 |---|---|
-| ![](docs/screenshots/schedule-tablet.png) | ![](docs/screenshots/schedule-phone.png) |
+| ![主页](docs/screenshots/HOME.jpg) | ![](docs/screenshots/schedule-phone.png) |
+| ![小组件](docs/screenshots/WIDGET.jpg) |---|
 
 更多：课程详情、今日页、设置、学期设置见 `docs/screenshots/`。
 
