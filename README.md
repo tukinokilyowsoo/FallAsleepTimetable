@@ -2,7 +2,7 @@
 
 一个 Material You（Material 3）风格的 Android 课程表应用：离线、无账号、无后端，手机与平板自适应。
 
-> 当前状态：**M3 进行中** —— 已完成修改上课时间、导入系统日历、两种自适应桌面小组件；接下来补 ICS/CSV、分享图与细节打磨。
+> 当前状态：**v0.4.0-beta 测试版** —— M0–M2 已验证；M3 已完成修改上课时间、系统日历、桌面小组件与莫奈取色。剩余功能见 [剩余功能执行计划](docs/剩余功能执行计划.md)。
 
 ## 技术栈
 
@@ -23,11 +23,14 @@
 
 详细环境与验证记录见 [docs/M0-记录.md](docs/M0-记录.md)、[docs/M1-记录.md](docs/M1-记录.md)、[docs/M2-记录.md](docs/M2-记录.md) 与 [docs/M3-记录.md](docs/M3-记录.md)。
 
+- [v0.4.0-beta 阶段性交付报告](docs/交付报告-v0.4.0-beta.md)
+- [剩余功能执行计划](docs/剩余功能执行计划.md)
+
 ## 下载 / 测试版
 
-测试版发布在仓库的 **Releases** 页面：`v0.3.0-beta2`（`app-release.apk`）。
+测试版发布在仓库的 **Releases** 页面：`v0.4.0-beta`（`FallAsleepTimetable_arm64_v0.4.0-beta.apk`，arm64-v8a，约 10 MB）。
 
-> 包名：`io.github.tukinokilyowsoo.fallasleeptimetable`。从 beta2 起更换了包名，可与旧版并存；数据不互通，需要导出 JSON 再导入。
+> 包名：`io.github.tukinokilyowsoo.fallasleeptimetable`。从 beta2 起更换了包名，可与更早版本并存；数据不互通，需要导出 JSON 再导入。
 
 发布流程与签名备份说明见 [docs/RELEASE-流程.md](docs/RELEASE-流程.md)。
 
