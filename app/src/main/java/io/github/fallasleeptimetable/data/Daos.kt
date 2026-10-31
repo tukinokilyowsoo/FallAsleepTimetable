@@ -16,6 +16,22 @@ data class CourseWithSessions(
     val sessions: List<CourseSessionEntity>,
 )
 
+data class CourseSearchRow(
+    val timetableId: Long,
+    val timetableName: String,
+    val courseId: Long,
+    val courseName: String,
+    val teacher: String?,
+    val room: String?,
+    val dayOfWeek: Int,
+    val startPeriod: Int,
+    val periodCount: Int,
+    val startWeek: Int,
+    val endWeek: Int,
+    val parity: Int,
+    val colorIndex: Int,
+)
+
 @Dao
 interface TermDao {
     @Query("SELECT * FROM term ORDER BY id LIMIT 1")
@@ -79,6 +95,24 @@ interface CourseDao {
 
     @Query("SELECT * FROM course_session WHERE id = :id")
     suspend fun getSession(id: Long): CourseSessionEntity?
+
+    @Query(
+        """
+        SELECT t.id AS timetableId, t.name AS timetableName,
+               c.id AS courseId, c.name AS courseName, c.teacher,
+               s.room, s.dayOfWeek, s.startPeriod, s.periodCount,
+               s.startWeek, s.endWeek, s.parity, c.colorIndex
+        FROM course_session s
+        JOIN course c ON c.id = s.courseId
+        JOIN timetable t ON t.id = c.timetableId
+        WHERE instr(lower(c.name), lower(:query)) > 0
+           OR instr(lower(IFNULL(c.teacher, '')), lower(:query)) > 0
+           OR instr(lower(IFNULL(s.room, '')), lower(:query)) > 0
+        ORDER BY c.name, s.dayOfWeek, s.startPeriod
+        LIMIT 200
+        """,
+    )
+    suspend fun search(query: String): List<CourseSearchRow>
 
     @Insert
     suspend fun insertCourse(course: CourseEntity): Long

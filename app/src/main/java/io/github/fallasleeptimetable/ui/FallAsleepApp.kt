@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.fallasleeptimetable.R
+import io.github.fallasleeptimetable.data.CourseSearchRow
 import io.github.fallasleeptimetable.ui.screens.CourseEditorDialog
 import io.github.fallasleeptimetable.ui.screens.CreateTimetableDialog
 import io.github.fallasleeptimetable.ui.screens.EduImportActivity
@@ -86,6 +87,8 @@ fun FallAsleepApp(
     val scheduleViewModel: ScheduleViewModel = viewModel()
     val state by scheduleViewModel.uiState.collectAsStateWithLifecycle()
     val message by scheduleViewModel.message.collectAsStateWithLifecycle()
+    val searchQuery by scheduleViewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchResults by scheduleViewModel.searchResults.collectAsStateWithLifecycle()
 
     var destination by rememberSaveable { mutableStateOf(AppDestination.Schedule) }
     var fabExpanded by remember { mutableStateOf(false) }
@@ -166,6 +169,10 @@ fun FallAsleepApp(
                         onCreateTimetableRequest = { showCreateTimetable = true },
                         message = message,
                         onConsumeMessage = scheduleViewModel::consumeMessage,
+                        searchQuery = searchQuery,
+                        searchResults = searchResults,
+                        onSearchCourses = scheduleViewModel::searchCourses,
+                        onSearchResultClick = scheduleViewModel::jumpToSearchResult,
                     )
                 }
                 if (!fullscreen) {
@@ -223,6 +230,10 @@ fun FallAsleepApp(
                         onCreateTimetableRequest = { showCreateTimetable = true },
                         message = message,
                         onConsumeMessage = scheduleViewModel::consumeMessage,
+                        searchQuery = searchQuery,
+                        searchResults = searchResults,
+                        onSearchCourses = scheduleViewModel::searchCourses,
+                        onSearchResultClick = scheduleViewModel::jumpToSearchResult,
                     )
                 }
             }
@@ -449,6 +460,10 @@ private fun AppContent(
     onCreateTimetableRequest: () -> Unit,
     message: String?,
     onConsumeMessage: () -> Unit,
+    searchQuery: String,
+    searchResults: List<CourseSearchRow>,
+    onSearchCourses: (String) -> Unit,
+    onSearchResultClick: (CourseSearchRow) -> Unit,
 ) {
     when (destination) {
         AppDestination.Schedule -> ScheduleScreen(
@@ -461,6 +476,10 @@ private fun AppContent(
             onDeleteCourse = viewModel::deleteCourse,
             onEditRequest = onEditRequest,
             onCreateTimetableRequest = onCreateTimetableRequest,
+            searchQuery = searchQuery,
+            searchResults = searchResults,
+            onSearchCourses = onSearchCourses,
+            onSearchResultClick = onSearchResultClick,
         )
 
         AppDestination.Today -> TodayScreen(state = state)
@@ -478,6 +497,8 @@ private fun AppContent(
             onDeleteTimetable = viewModel::deleteTimetable,
             onRenameTimetable = viewModel::renameTimetable,
             onExportTimetable = viewModel::exportTimetableJson,
+            onExportIcs = viewModel::exportTimetableIcs,
+            onExportCsv = viewModel::exportTimetableCsv,
             onImportTimetable = viewModel::importTimetableText,
             message = message,
             onConsumeMessage = onConsumeMessage,

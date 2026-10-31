@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -90,16 +92,18 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.fallasleeptimetable.R
-import io.github.fallasleeptimetable.data.CourseWithSessions
+import io.github.fallasleeptimetable.data.CourseSearchRow
 import io.github.fallasleeptimetable.data.TermEntity
 import io.github.fallasleeptimetable.domain.CourseDraft
 import io.github.fallasleeptimetable.domain.VisibleSession
-import io.github.fallasleeptimetable.domain.sessionActiveInWeek
+import io.github.fallasleeptimetable.domain.assignLanes
+import io.github.fallasleeptimetable.domain.visibleSessions
 import io.github.fallasleeptimetable.ui.ScheduleUiState
 import io.github.fallasleeptimetable.ui.dayLabel
 import io.github.fallasleeptimetable.ui.dayShortLabel
 import io.github.fallasleeptimetable.ui.formatMinutes
 import io.github.fallasleeptimetable.ui.periodLabel
+import io.github.fallasleeptimetable.ui.weekRangeLabel
 import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.LocalTime
@@ -120,9 +124,14 @@ fun ScheduleScreen(
     onDeleteCourse: (Long) -> Unit,
     onEditRequest: (EditorRequest) -> Unit,
     onCreateTimetableRequest: () -> Unit,
+    searchQuery: String,
+    searchResults: List<CourseSearchRow>,
+    onSearchCourses: (String) -> Unit,
+    onSearchResultClick: (CourseSearchRow) -> Unit,
 ) {
     val term = state.term
     var detailSession by remember { mutableStateOf<VisibleSession?>(null) }
+    var showSearch by remember { mutableStateOf(false) }
 
     val weekSessions = remember(state.courses, state.currentWeek) {
         visibleSessions(state.courses, state.currentWeek)
@@ -133,6 +142,14 @@ fun ScheduleScreen(
             if (!fullscreen) {
                 TopAppBar(
                     title = { Text(state.selectedTimetable?.name ?: "课表") },
+                    actions = {
+                        IconButton(onClick = { showSearch = true }) {
+                            Icon(
+                                Icons.Filled.Search,
+                                contentDescription = "搜索课程",
+                            )
+                        }
+                    },
                 )
             }
         },
@@ -269,6 +286,113 @@ fun ScheduleScreen(
             onDismiss = { detailSession = null },
         )
     }
+
+    if (showSearch) {
+        CourseSearchDialog(
+            query = searchQuery,
+            results = searchResults,
+            onQueryChange = onSearchCourses,
+            onResultClick = { row ->
+                onSearchResultClick(row)
+                showSearch = false
+            },
+            onDismiss = {
+                showSearch = false
+                onSearchCourses("")
+            },
+        )
+    }
+}
+
+@Composable
+private fun CourseSearchDialog(
+    query: String,
+    results: List<CourseSearchRow>,
+    onQueryChange: (String) -> Unit,
+    onResultClick: (CourseSearchRow) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("搜索课程") },
+        text = {
+            Column(modifier = Modifier.heightIn(max = 460.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("课程名、教师或教室") },
+                    leadingIcon = {
+                        Icon(Icons.Filled.Search, contentDescription = null)
+                    },
+                    singleLine = true,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                when {
+                    query.isBlank() -> Text(
+                        text = "输入关键词后显示结果，点击结果跳转到对应课表与周次。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    results.isEmpty() -> Text(
+                        text = "没有匹配的课程",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    else -> LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(results) { row ->
+                            val colors = courseColors(row.colorIndex)
+                            ListItem(
+                                headlineContent = { Text(row.courseName) },
+                                overlineContent = { Text(row.timetableName) },
+                                supportingContent = {
+                                    Text(
+                                        buildString {
+                                            append(dayLabel(row.dayOfWeek)).append(' ')
+                                            append(
+                                                periodLabel(
+                                                    row.startPeriod,
+                                                    row.periodCount,
+                                                ),
+                                            )
+                                            append(" · ")
+                                            append(
+                                                weekRangeLabel(
+                                                    row.startWeek,
+                                                    row.endWeek,
+                                                    row.parity,
+                                                ),
+                                            )
+                                            row.teacher?.takeIf { it.isNotBlank() }?.let {
+                                                append(" · ").append(it)
+                                            }
+                                            row.room?.takeIf { it.isNotBlank() }?.let {
+                                                append(" · ").append(it)
+                                            }
+                                        },
+                                    )
+                                },
+                                leadingContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(colors.container),
+                                    )
+                                },
+                                modifier = Modifier.clickable { onResultClick(row) },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("关闭") }
+        },
+    )
 }
 
 @Composable
@@ -798,47 +922,3 @@ internal fun CreateTimetableDialog(
     )
 }
 
-internal fun visibleSessions(
-    courses: List<CourseWithSessions>,
-    week: Int,
-): List<VisibleSession> = courses.flatMap { entry ->
-    entry.sessions
-        .filter { session ->
-            sessionActiveInWeek(session.startWeek, session.endWeek, session.parity, week)
-        }
-        .map { session ->
-            VisibleSession(
-                courseId = entry.course.id,
-                sessionId = session.id,
-                name = entry.course.name,
-                teacher = entry.course.teacher,
-                room = session.room,
-                dayOfWeek = session.dayOfWeek,
-                startPeriod = session.startPeriod,
-                periodCount = session.periodCount,
-                startWeek = session.startWeek,
-                endWeek = session.endWeek,
-                parity = session.parity,
-                colorIndex = entry.course.colorIndex,
-            )
-        }
-}
-
-private fun assignLanes(sessions: List<VisibleSession>): Pair<Map<Long, Int>, Int> {
-    val laneEnds = mutableListOf<Int>()
-    val laneOf = mutableMapOf<Long, Int>()
-    sessions
-        .sortedWith(compareBy({ it.startPeriod }, { it.sessionId }))
-        .forEach { session ->
-            val end = session.startPeriod + session.periodCount - 1
-            val free = laneEnds.indexOfFirst { it < session.startPeriod }
-            if (free == -1) {
-                laneOf[session.sessionId] = laneEnds.size
-                laneEnds.add(end)
-            } else {
-                laneOf[session.sessionId] = free
-                laneEnds[free] = end
-            }
-        }
-    return laneOf to laneEnds.size.coerceAtLeast(1)
-}

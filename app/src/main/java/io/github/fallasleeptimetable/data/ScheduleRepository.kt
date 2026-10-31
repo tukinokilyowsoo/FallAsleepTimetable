@@ -2,7 +2,7 @@ package io.github.fallasleeptimetable.data
 
 import androidx.room.withTransaction
 import io.github.fallasleeptimetable.data.importer.ImportedTimetable
-import io.github.fallasleeptimetable.data.importer.TimetableImporter
+import io.github.fallasleeptimetable.data.importer.TimetableFileImporter
 import io.github.fallasleeptimetable.domain.CourseDraft
 import kotlinx.coroutines.flow.Flow
 import java.time.DayOfWeek
@@ -102,6 +102,12 @@ class ScheduleRepository(private val db: AppDatabase) {
         courseDao.deleteCourse(courseId)
     }
 
+    suspend fun searchCourses(query: String): List<CourseSearchRow> {
+        val keyword = query.trim()
+        if (keyword.isEmpty()) return emptyList()
+        return courseDao.search(keyword)
+    }
+
     suspend fun updateTerm(updated: TermEntity) {
         db.withTransaction {
             termDao.update(updated)
@@ -148,7 +154,9 @@ class ScheduleRepository(private val db: AppDatabase) {
     }
 
     suspend fun importTimetableFromText(termId: Long, text: String): ImportResult {
-        val parsed = TimetableImporter.parse(text)
+        val term = termDao.get(termId) ?: error("还没有学期，无法导入")
+        val slots = timeSlotDao.getByTerm(termId)
+        val parsed = TimetableFileImporter.parse(text, term, slots)
         return importParsedTimetable(termId, parsed)
     }
 

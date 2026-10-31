@@ -2,6 +2,7 @@ package io.github.fallasleeptimetable.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -69,6 +70,8 @@ import io.github.fallasleeptimetable.R
 import io.github.fallasleeptimetable.data.TermEntity
 import io.github.fallasleeptimetable.data.calendar.CalendarScheduleExporter
 import io.github.fallasleeptimetable.data.diagnostics.ImportLog
+import io.github.fallasleeptimetable.data.share.ScheduleImageExporter
+import io.github.fallasleeptimetable.data.share.ShareLauncher
 import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.ui.ScheduleUiState
 import io.github.fallasleeptimetable.widget.WidgetThemeSetting
@@ -96,6 +99,8 @@ fun SettingsScreen(
     onDeleteTimetable: (Long) -> Unit,
     onRenameTimetable: (Long, String) -> Unit,
     onExportTimetable: () -> String?,
+    onExportIcs: () -> String?,
+    onExportCsv: () -> String?,
     onImportTimetable: (String) -> Unit,
     message: String?,
     onConsumeMessage: () -> Unit,
@@ -113,6 +118,8 @@ fun SettingsScreen(
     var pendingCalendarAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var deleteCurrentCalendarConfirm by remember { mutableStateOf(false) }
     var deleteAllCalendarConfirm by remember { mutableStateOf(false) }
+    var showShareImage by remember { mutableStateOf(false) }
+    var shareBusy by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var widgetTheme by remember { mutableStateOf(WidgetThemeSetting.get(context)) }
@@ -245,25 +252,33 @@ fun SettingsScreen(
         }
     }
 
+    fun saveText(uri: Uri?, content: String?, successMessage: String) {
+        if (uri == null) return
+        if (content == null) {
+            localMessage = "当前课表没有可导出的课程"
+            return
+        }
+        localMessage = runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.write(content.toByteArray(Charsets.UTF_8))
+            } ?: error("无法写入文件")
+        }.fold(
+            onSuccess = { successMessage },
+            onFailure = { "导出失败：${it.message ?: "未知错误"}" },
+        )
+    }
+
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
-    ) { uri ->
-        if (uri != null) {
-            val json = onExportTimetable()
-            if (json == null) {
-                localMessage = "当前没有可导出的课表"
-            } else {
-                localMessage = runCatching {
-                    context.contentResolver.openOutputStream(uri)?.use { stream ->
-                        stream.write(json.toByteArray(Charsets.UTF_8))
-                    } ?: error("无法写入文件")
-                }.fold(
-                    onSuccess = { "课表已导出" },
-                    onFailure = { "导出失败：${it.message ?: "未知错误"}" },
-                )
-            }
-        }
-    }
+    ) { uri -> saveText(uri, onExportTimetable(), "课表已导出为 JSON") }
+
+    val exportIcsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/calendar"),
+    ) { uri -> saveText(uri, onExportIcs(), "课表已导出为 ICS") }
+
+    val exportCsvLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri -> saveText(uri, onExportCsv(), "课表已导出为 CSV") }
 
     val logLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain"),
@@ -517,8 +532,8 @@ fun SettingsScreen(
             item { SectionHeader("数据") }
             item {
                 ListItem(
-                    headlineContent = { Text("导出当前课表") },
-                    supportingContent = { Text("保存为 FallAsleep JSON 备份") },
+                    headlineContent = { Text("导出 JSON 备份") },
+                    supportingContent = { Text("完整备份，可在本应用恢复") },
                     leadingContent = { Icon(Icons.Filled.Share, contentDescription = null) },
                     modifier = Modifier.clickable {
                         exportLauncher.launch("FallAsleep课表.json")
@@ -527,8 +542,48 @@ fun SettingsScreen(
             }
             item {
                 ListItem(
+                    headlineContent = { Text("导出 ICS 日历") },
+                    supportingContent = { Text("可导入系统日历、Google 日历等") },
+                    leadingContent = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+                    modifier = Modifier.clickable {
+                        exportIcsLauncher.launch("FallAsleep课表.ics")
+                    },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("导出 CSV 表格") },
+                    supportingContent = { Text("可导入 Excel 或其他课程表工具") },
+                    leadingContent = { Icon(Icons.Filled.Share, contentDescription = null) },
+                    modifier = Modifier.clickable {
+                        exportCsvLauncher.launch("FallAsleep课表.csv")
+                    },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("分享课表长图") },
+                    supportingContent = {
+                        Text(
+                            if (shareBusy) {
+                                "正在生成图片…"
+                            } else {
+                                "生成本周或整学期 PNG，可保存或发送"
+                            },
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Filled.Share, contentDescription = null) },
+                    modifier = Modifier.clickable(enabled = !shareBusy) {
+                        showShareImage = true
+                    },
+                )
+            }
+            item {
+                ListItem(
                     headlineContent = { Text("导入课表") },
-                    supportingContent = { Text("支持 JSON 备份与旧版 .wakeup_schedule") },
+                    supportingContent = {
+                        Text("支持 JSON / ICS / CSV / 旧版 .wakeup_schedule")
+                    },
                     leadingContent = { Icon(Icons.Filled.Add, contentDescription = null) },
                     modifier = Modifier.clickable {
                         importLauncher.launch(arrayOf("*/*"))
@@ -605,7 +660,7 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("FallAsleep 课程表") },
-                    supportingContent = { Text("版本 ${BuildConfig.VERSION_NAME} · M1") },
+                    supportingContent = { Text("版本 ${BuildConfig.VERSION_NAME} · 离线课程表") },
                     leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
                 )
             }
@@ -764,6 +819,60 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { deleteAllCalendarConfirm = false }) {
                     Text("取消")
+                }
+            },
+        )
+    }
+
+    if (showShareImage) {
+        ShareImageDialog(
+            onDismiss = { showShareImage = false },
+            onShare = { options ->
+                showShareImage = false
+                val term = state.term
+                val table = state.selectedTimetable
+                if (term == null || table == null) {
+                    localMessage = "还没有可分享的课表"
+                } else {
+                    val courses = state.courses
+                    val slots = state.timeSlots
+                    val week = state.currentWeek
+                    shareBusy = true
+                    scope.launch {
+                        val outcome = withContext(Dispatchers.Default) {
+                            runCatching {
+                                ScheduleImageExporter.renderPng(
+                                    term = term,
+                                    timetableName = table.name,
+                                    courses = courses,
+                                    timeSlots = slots,
+                                    currentWeek = week,
+                                    options = options,
+                                )
+                            }
+                        }
+                        shareBusy = false
+                        outcome.fold(
+                            onSuccess = { png ->
+                                if (png == null) {
+                                    localMessage = "当前课表还没有课程"
+                                } else {
+                                    runCatching {
+                                        ShareLauncher.sharePng(
+                                            context,
+                                            png,
+                                            "FallAsleep课表.png",
+                                        )
+                                    }.onFailure {
+                                        localMessage = "分享失败：${it.message ?: "未知错误"}"
+                                    }
+                                }
+                            },
+                            onFailure = {
+                                localMessage = "生成图片失败：${it.message ?: "未知错误"}"
+                            },
+                        )
+                    }
                 }
             },
         )

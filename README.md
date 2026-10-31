@@ -2,7 +2,7 @@
 
 一个 Material You（Material 3）风格的 Android 课程表应用：离线、无账号、无后端，手机与平板自适应。
 
-> 当前状态：**v0.4.0-beta 测试版** —— M0–M2 已验证；M3 已完成修改上课时间、系统日历、桌面小组件与莫奈取色。剩余功能见 [剩余功能执行计划](docs/剩余功能执行计划.md)。
+> 当前状态：**v0.5.1-beta 测试版** —— M0–M2 已验证；M3 已完成修改上课时间、系统日历、桌面小组件、莫奈取色、ICS/CSV 导入导出、课表分享长图与课程搜索。剩余功能见 [剩余功能执行计划](docs/剩余功能执行计划.md)。
 
 ## 技术栈
 
@@ -18,17 +18,19 @@
 | M0 | 工程骨架、M3 主题、自适应导航、真机截图 | ✅ |
 | M1 | Room 数据模型、课表网格、课程增删改、多课表、学期设置、导入导出 | ✅ |
 | M2 | 教务导入（正方 / 新正方 / 强智 + WebView、重命名、日志） | ✅ 已完成并验证 |
-| M3 | 提醒、小组件、ICS/CSV、分享图 | 进行中（已完成：修改上课时间、系统日历、桌面小组件） |
+| M3 | 提醒、小组件、ICS/CSV、分享图 | 进行中（已完成：上课时间、系统日历、桌面小组件、ICS/CSV、分享长图、课程搜索） |
 | M4 | 多学期、备份、无障碍、打磨 | 计划中 |
 
 详细环境与验证记录见 [docs/M0-记录.md](docs/M0-记录.md)、[docs/M1-记录.md](docs/M1-记录.md)、[docs/M2-记录.md](docs/M2-记录.md) 与 [docs/M3-记录.md](docs/M3-记录.md)。
 
+- [v0.5.1-beta 更新说明](docs/RELEASE-NOTES-v0.5.1-beta.md)
+- [v0.5.0-beta 更新说明](docs/RELEASE-NOTES-v0.5.0-beta.md)
 - [v0.4.0-beta 阶段性交付报告](docs/交付报告-v0.4.0-beta.md)
 - [剩余功能执行计划](docs/剩余功能执行计划.md)
 
 ## 下载 / 测试版
 
-测试版发布在仓库的 **Releases** 页面：`v0.4.0-beta`（`FallAsleepTimetable_arm64_v0.4.0-beta.apk`，arm64-v8a，约 10 MB）。
+测试版发布在仓库的 **Releases** 页面：`v0.5.1-beta`（`FallAsleepTimetable_arm64_v0.5.1-beta.apk`，arm64-v8a，约 10 MB）。
 
 > 包名：`io.github.tukinokilyowsoo.fallasleeptimetable`。从 beta2 起更换了包名，可与更早版本并存；数据不互通，需要导出 JSON 再导入。
 

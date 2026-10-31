@@ -6,13 +6,19 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.fallasleeptimetable.BuildConfig
 import io.github.fallasleeptimetable.data.AppContainer
+import io.github.fallasleeptimetable.data.CourseSearchRow
 import io.github.fallasleeptimetable.data.CourseWithSessions
 import io.github.fallasleeptimetable.data.TermEntity
 import io.github.fallasleeptimetable.data.TimeSlotEntity
 import io.github.fallasleeptimetable.data.TimetableEntity
+import io.github.fallasleeptimetable.data.importer.CsvExporter
+import io.github.fallasleeptimetable.data.importer.IcsExporter
 import io.github.fallasleeptimetable.data.importer.TimetableExporter
 import io.github.fallasleeptimetable.domain.CourseDraft
+import io.github.fallasleeptimetable.domain.sessionActiveInWeek
 import io.github.fallasleeptimetable.domain.weekNumberFor
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import io.github.fallasleeptimetable.widget.WidgetUpdater
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,8 +105,52 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery
+
+    private val _searchResults = MutableStateFlow<List<CourseSearchRow>>(emptyList())
+    val searchResults: StateFlow<List<CourseSearchRow>> = _searchResults
+
+    private var searchJob: Job? = null
+
     fun consumeMessage() {
         _message.value = null
+    }
+
+    fun searchCourses(query: String) {
+        _searchQuery.value = query
+        searchJob?.cancel()
+        if (query.isBlank()) {
+            _searchResults.value = emptyList()
+            return
+        }
+        searchJob = viewModelScope.launch {
+            delay(150)
+            _searchResults.value = runCatching {
+                repository.searchCourses(query)
+            }.getOrDefault(emptyList())
+        }
+    }
+
+    fun jumpToSearchResult(result: CourseSearchRow) {
+        selectTimetable(result.timetableId)
+        val term = uiState.value.term ?: return
+        val actualWeek = uiState.value.actualWeek
+        val week = if (
+            sessionActiveInWeek(
+                result.startWeek,
+                result.endWeek,
+                result.parity,
+                actualWeek,
+            )
+        ) {
+            actualWeek
+        } else {
+            (result.startWeek..result.endWeek).firstOrNull { week ->
+                sessionActiveInWeek(result.startWeek, result.endWeek, result.parity, week)
+            } ?: result.startWeek
+        }
+        weekOverride.value = week.coerceIn(1, term.totalWeeks)
     }
 
     fun exportTimetableJson(): String? {
@@ -108,6 +158,25 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         val table = state.selectedTimetable ?: return null
         val term = state.term ?: return null
         return TimetableExporter.buildJson(term, table, state.courses, state.timeSlots)
+    }
+
+    fun exportTimetableIcs(): String? {
+        val state = uiState.value
+        val table = state.selectedTimetable ?: return null
+        val term = state.term ?: return null
+        if (state.courses.isEmpty()) return null
+        return IcsExporter.build(
+            term = term,
+            timetableName = table.name,
+            courses = state.courses,
+            timeSlots = state.timeSlots,
+        )
+    }
+
+    fun exportTimetableCsv(): String? {
+        val state = uiState.value
+        if (state.selectedTimetable == null || state.courses.isEmpty()) return null
+        return CsvExporter.build(state.courses)
     }
 
     fun importTimetableText(text: String) {

@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import io.github.fallasleeptimetable.domain.visibleSessions
 import io.github.fallasleeptimetable.ui.ScheduleUiState
 import io.github.fallasleeptimetable.ui.dayLabel
 import io.github.fallasleeptimetable.ui.formatMinutes
