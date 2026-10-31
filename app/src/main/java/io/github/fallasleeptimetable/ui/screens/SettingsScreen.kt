@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -102,7 +103,7 @@ fun SettingsScreen(
     var showTermDialog by remember { mutableStateOf(false) }
     var showClassTimeDialog by remember { mutableStateOf(false) }
     var showThemeColorDialog by remember { mutableStateOf(false) }
-    var showWidgetThemeDialog by remember { mutableStateOf(false) }
+    var widgetThemeMenuOpen by remember { mutableStateOf(false) }
     var termMenuOpen by remember { mutableStateOf(false) }
     var showCreateTimetable by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<TimetableEntity?>(null) }
@@ -120,7 +121,6 @@ fun SettingsScreen(
         WidgetThemeSetting.set(context, value)
         widgetTheme = value
         WidgetUpdater.updateAll(context)
-        showWidgetThemeDialog = false
     }
 
     fun runCalendarExport() {
@@ -377,15 +377,48 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("小组件样式") },
-                    supportingContent = { Text("深色 / 浅色 / 跟随系统") },
+                    supportingContent = {
+                        Text("当前：${WidgetThemeSetting.label(widgetTheme)}")
+                    },
                     leadingContent = {
                         Icon(
                             painter = painterResource(R.drawable.ic_palette),
                             contentDescription = null,
                         )
                     },
-                    trailingContent = { Text(WidgetThemeSetting.label(widgetTheme)) },
-                    modifier = Modifier.clickable { showWidgetThemeDialog = true },
+                    trailingContent = {
+                        Box {
+                            TextButton(onClick = { widgetThemeMenuOpen = true }) {
+                                Text("设置")
+                            }
+                            DropdownMenu(
+                                expanded = widgetThemeMenuOpen,
+                                onDismissRequest = { widgetThemeMenuOpen = false },
+                            ) {
+                                listOf(
+                                    WidgetThemeSetting.SYSTEM to "跟随系统",
+                                    WidgetThemeSetting.LIGHT to "浅色",
+                                    WidgetThemeSetting.DARK to "深色",
+                                ).forEach { (value, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        leadingIcon = {
+                                            if (widgetTheme == value) {
+                                                Icon(
+                                                    Icons.Filled.Check,
+                                                    contentDescription = null,
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            widgetThemeMenuOpen = false
+                                            applyWidgetTheme(value)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    },
                 )
             }
             item { HorizontalDivider() }
@@ -732,38 +765,6 @@ fun SettingsScreen(
                 TextButton(onClick = { deleteAllCalendarConfirm = false }) {
                     Text("取消")
                 }
-            },
-        )
-    }
-
-    if (showWidgetThemeDialog) {
-        AlertDialog(
-            onDismissRequest = { showWidgetThemeDialog = false },
-            title = { Text("小组件样式") },
-            text = {
-                Column {
-                    listOf(
-                        WidgetThemeSetting.SYSTEM to "跟随系统",
-                        WidgetThemeSetting.LIGHT to "浅色",
-                        WidgetThemeSetting.DARK to "深色",
-                    ).forEach { (value, label) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { applyWidgetTheme(value) },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(
-                                selected = widgetTheme == value,
-                                onClick = { applyWidgetTheme(value) },
-                            )
-                            Text(label)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showWidgetThemeDialog = false }) { Text("关闭") }
             },
         )
     }

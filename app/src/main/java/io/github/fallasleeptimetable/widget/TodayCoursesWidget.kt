@@ -16,8 +16,6 @@ import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
-import androidx.glance.layout.Alignment
-import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
@@ -93,112 +91,89 @@ private fun TodayCoursesContent(
             val remainingToday = todaySessions.filter { it.endMinute > nowMinutes }
             val allDoneToday = todaySessions.isNotEmpty() && remainingToday.isEmpty()
 
-            if (dayCount == 1 && allDoneToday) {
-                Box(
-                    modifier = GlanceModifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "你免费啦😋",
-                        style = TextStyle(
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = ColorProvider(palette.text),
-                        ),
-                    )
-                }
-            } else {
-                Row(modifier = GlanceModifier.fillMaxWidth()) {
-                    repeat(dayCount) { index ->
-                        val date = today.plusDays(index.toLong())
-                        val week = data.actualWeek(date)
-                        val sessions = if (index == 0) {
-                            remainingToday
-                        } else if (week in 1..data.term.totalWeeks) {
-                            data.sessionsForWeek(week)
-                                .filter { it.dayOfWeek == date.dayOfWeek.value }
-                                .sortedBy { it.startPeriod }
-                        } else {
-                            emptyList()
-                        }
+            Row(modifier = GlanceModifier.fillMaxWidth()) {
+                repeat(dayCount) { index ->
+                    val date = today.plusDays(index.toLong())
+                    val week = data.actualWeek(date)
+                    val sessions = if (index == 0) {
+                        remainingToday
+                    } else if (week in 1..data.term.totalWeeks) {
+                        data.sessionsForWeek(week)
+                            .filter { it.dayOfWeek == date.dayOfWeek.value }
+                            .sortedBy { it.startPeriod }
+                    } else {
+                        emptyList()
+                    }
 
-                        Column(
-                            modifier = GlanceModifier
-                                .defaultWeight()
-                                .padding(horizontal = 4.dp),
-                        ) {
+                    Column(
+                        modifier = GlanceModifier
+                            .defaultWeight()
+                            .padding(horizontal = 4.dp),
+                    ) {
+                        Text(
+                            text = "${dayLabel(index)} ${date.monthValue}/${date.dayOfMonth}",
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = ColorProvider(palette.text),
+                            ),
+                            maxLines = 1,
+                        )
+                        Spacer(modifier = GlanceModifier.height(4.dp))
+
+                        if (index == 0 && allDoneToday) {
                             Text(
-                                text = "${dayLabel(index)} ${date.monthValue}/${date.dayOfMonth}",
+                                text = "你已免费，辛苦了喵😋",
                                 style = TextStyle(
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = ColorProvider(palette.text),
+                                    fontSize = 10.sp,
+                                    color = ColorProvider(palette.secondaryText),
                                 ),
-                                maxLines = 1,
+                                maxLines = 2,
                             )
-                            Spacer(modifier = GlanceModifier.height(4.dp))
+                        } else if (sessions.isEmpty()) {
+                            Text(
+                                text = "没有课",
+                                style = TextStyle(
+                                    fontSize = 10.sp,
+                                    color = ColorProvider(palette.secondaryText),
+                                ),
+                            )
+                        } else {
+                            sessions.forEach { session ->
+                                val colorIndex = ((session.colorIndex % 6) + 6) % 6
+                                val container = palette.containers[colorIndex]
+                                val contentColor = palette.onContainers[colorIndex]
 
-                            if (index == 0 && allDoneToday) {
-                                Box(
+                                Column(
                                     modifier = GlanceModifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 16.dp),
-                                    contentAlignment = Alignment.Center,
+                                        .padding(vertical = 2.dp)
+                                        .background(ColorProvider(container))
+                                        .cornerRadius(10.dp)
+                                        .padding(5.dp),
                                 ) {
                                     Text(
-                                        text = "你免费啦😋",
+                                        text = "${formatMinutes(session.startMinute)} ${session.name}",
                                         style = TextStyle(
-                                            fontSize = 12.sp,
+                                            fontSize = if (dayCount == 1) 12.sp else 11.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = ColorProvider(palette.text),
+                                            color = ColorProvider(contentColor),
                                         ),
+                                        maxLines = if (dayCount == 1) 2 else 3,
                                     )
-                                }
-                            } else if (sessions.isEmpty()) {
-                                Text(
-                                    text = "没有课",
-                                    style = TextStyle(
-                                        fontSize = 10.sp,
-                                        color = ColorProvider(palette.secondaryText),
-                                    ),
-                                )
-                            } else {
-                                sessions.forEach { session ->
-                                    val colorIndex = ((session.colorIndex % 6) + 6) % 6
-                                    val container = palette.containers[colorIndex]
-                                    val contentColor = palette.onContainers[colorIndex]
-
-                                    Column(
-                                        modifier = GlanceModifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 2.dp)
-                                            .background(ColorProvider(container))
-                                            .cornerRadius(10.dp)
-                                            .padding(5.dp),
-                                    ) {
+                                    val detail = listOfNotNull(
+                                        session.room,
+                                        session.teacher,
+                                    ).joinToString(" · ")
+                                    if (detail.isNotBlank()) {
                                         Text(
-                                            text = "${formatMinutes(session.startMinute)} ${session.name}",
+                                            text = detail,
                                             style = TextStyle(
-                                                fontSize = if (dayCount == 1) 12.sp else 11.sp,
-                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 9.sp,
                                                 color = ColorProvider(contentColor),
                                             ),
-                                            maxLines = if (dayCount == 1) 2 else 3,
+                                            maxLines = 1,
                                         )
-                                        val detail = listOfNotNull(
-                                            session.room,
-                                            session.teacher,
-                                        ).joinToString(" · ")
-                                        if (detail.isNotBlank()) {
-                                            Text(
-                                                text = detail,
-                                                style = TextStyle(
-                                                    fontSize = 9.sp,
-                                                    color = ColorProvider(contentColor),
-                                                ),
-                                                maxLines = 1,
-                                            )
-                                        }
                                     }
                                 }
                             }
