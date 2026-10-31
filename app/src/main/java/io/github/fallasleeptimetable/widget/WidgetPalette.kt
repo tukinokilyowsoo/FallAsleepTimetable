@@ -2,6 +2,7 @@ package io.github.fallasleeptimetable.widget
 
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Build
 import androidx.compose.ui.graphics.Color
 
 data class WidgetPalette(
@@ -50,7 +51,85 @@ object WidgetThemeSetting {
 }
 
 fun widgetPalette(context: Context): WidgetPalette {
-    return if (!WidgetThemeSetting.isDark(context)) {
+    val dark = WidgetThemeSetting.isDark(context)
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        monetPalette(context, dark)
+    } else {
+        fallbackPalette(dark)
+    }
+}
+
+/**
+ * 莫奈取色：使用系统动态色资源，按当前小组件样式取浅色/深色变体。
+ */
+private fun monetPalette(context: Context, dark: Boolean): WidgetPalette {
+    val themed = themedContext(context, dark)
+    fun c(colorRes: Int): Color = Color(themed.getColor(colorRes))
+
+    return if (!dark) {
+        WidgetPalette(
+            background = c(android.R.color.system_neutral1_10),
+            surface = c(android.R.color.system_neutral1_50),
+            text = c(android.R.color.system_neutral1_900),
+            secondaryText = c(android.R.color.system_neutral2_700),
+            outline = c(android.R.color.system_neutral2_500),
+            containers = listOf(
+                c(android.R.color.system_accent1_100),
+                c(android.R.color.system_accent2_100),
+                c(android.R.color.system_accent3_100),
+                c(android.R.color.system_neutral1_100),
+                c(android.R.color.system_accent1_200),
+                c(android.R.color.system_accent2_200),
+            ),
+            onContainers = listOf(
+                c(android.R.color.system_accent1_900),
+                c(android.R.color.system_accent2_900),
+                c(android.R.color.system_accent3_900),
+                c(android.R.color.system_neutral1_900),
+                c(android.R.color.system_accent1_900),
+                c(android.R.color.system_accent2_900),
+            ),
+            mutedContainer = c(android.R.color.system_neutral1_100),
+            mutedText = c(android.R.color.system_neutral2_700),
+        )
+    } else {
+        WidgetPalette(
+            background = c(android.R.color.system_neutral1_900),
+            surface = c(android.R.color.system_neutral1_800),
+            text = c(android.R.color.system_neutral1_50),
+            secondaryText = c(android.R.color.system_neutral2_200),
+            outline = c(android.R.color.system_neutral2_600),
+            containers = listOf(
+                c(android.R.color.system_accent1_800),
+                c(android.R.color.system_accent2_800),
+                c(android.R.color.system_accent3_800),
+                c(android.R.color.system_neutral1_800),
+                c(android.R.color.system_accent1_700),
+                c(android.R.color.system_accent2_700),
+            ),
+            onContainers = listOf(
+                c(android.R.color.system_accent1_100),
+                c(android.R.color.system_accent2_100),
+                c(android.R.color.system_accent3_100),
+                c(android.R.color.system_neutral1_100),
+                c(android.R.color.system_accent1_100),
+                c(android.R.color.system_accent2_100),
+            ),
+            mutedContainer = c(android.R.color.system_neutral1_800),
+            mutedText = c(android.R.color.system_neutral2_200),
+        )
+    }
+}
+
+private fun themedContext(context: Context, dark: Boolean): Context {
+    val configuration = Configuration(context.resources.configuration)
+    configuration.uiMode = (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+        if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+    return context.createConfigurationContext(configuration)
+}
+
+private fun fallbackPalette(dark: Boolean): WidgetPalette {
+    return if (!dark) {
         WidgetPalette(
             background = Color(0xFFFFFBFE),
             surface = Color(0xFFF3EDF7),
