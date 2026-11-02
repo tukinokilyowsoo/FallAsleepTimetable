@@ -101,7 +101,7 @@
         <receiver
             android:name=".widget.NiagaraTodayWidgetReceiver"
             android:exported="false"
-            android:label="今日课程（透明）">
+            android:label="今日课程*针对Niagara优化">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

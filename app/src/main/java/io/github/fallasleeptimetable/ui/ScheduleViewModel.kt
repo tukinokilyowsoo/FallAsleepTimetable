@@ -179,17 +179,21 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         return CsvExporter.build(state.courses)
     }
 
-    fun importTimetableText(text: String) {
+    fun importTimetableText(text: String, applySettings: Boolean = false) {
         val term = uiState.value.term
         if (term == null) {
             _message.value = "还没有学期，无法导入"
             return
         }
         viewModelScope.launch {
-            runCatching { repository.importTimetableFromText(term.id, text) }
+            runCatching { repository.importTimetableFromText(term.id, text, applySettings) }
                 .onSuccess { result ->
                     selectTimetable(result.timetableId)
-                    _message.value = "已导入 ${result.courseCount} 门课程"
+                    weekOverride.value = null
+                    _message.value = buildString {
+                        append("已导入 ").append(result.courseCount).append(" 门课程")
+                        if (applySettings) append("，并恢复学期设置与节次时间")
+                    }
                     WidgetUpdater.updateAll(appContext)
                 }
                 .onFailure { error ->

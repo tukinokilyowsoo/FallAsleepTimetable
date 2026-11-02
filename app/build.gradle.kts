@@ -22,8 +22,8 @@ android {
         applicationId = "io.github.tukinokilyowsoo.fallasleeptimetable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.5.3-beta"
+        versionCode = 12
+        versionName = "0.5.6-beta"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
@@ -97,6 +97,7 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.2.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

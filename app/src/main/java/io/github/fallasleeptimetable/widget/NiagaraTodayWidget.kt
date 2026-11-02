@@ -40,12 +40,13 @@ import java.time.LocalTime
 import kotlin.math.min
 
 /**
- * 面向 Niagara Launcher 等支持自由缩放启动器的透明今日课程组件。
+ * 面向 Niagara Launcher 等自由缩放启动器的透明今日课程组件。
  *
- * 极简待办式布局：课程名是主信息，用大号字横向铺满剩余宽度；
- * 第 n 节、时间、教室作为次要信息，小号字右对齐。
- * 字号由组件实际宽高的像素测量决定，不依赖启动器的字体设置。
- * 背景透明，文字按壁纸亮度自动取黑或白。
+ * 只保留最重要、最短的三项信息：开始时间 / 课程名 / 教室。
+ * 字号按“最长一行”实测并留 18% 安全余量，配合更小的 30sp 上限，
+ * 确保在 Niagara 关闭「填充屏幕」、或右侧被字母索引条占用时也能完整显示。
+ *
+ * 高度只按当天剩余课程数分配，不再为未出现的课程预留空槽。
  */
 class NiagaraTodayWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
@@ -77,17 +78,19 @@ class NiagaraTodayWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 private data class NiagaraRow(
+    val time: String,
     val name: String,
-    val meta: String,
+    val room: String,
 )
 
 private data class NiagaraLayout(
     val nameFontSize: TextUnit,
-    val metaFontSize: TextUnit,
+    val detailFontSize: TextUnit,
+    val timeWidth: Dp,
     val nameWidth: Dp,
-    val metaWidth: Dp,
+    val roomWidth: Dp,
     val gap: Dp,
-    val showMeta: Boolean,
+    val showRoom: Boolean,
 )
 
 @Composable
@@ -100,10 +103,12 @@ private fun NiagaraTodayContent(
 ) {
     val today = LocalDate.now()
     val nowMinutes = LocalTime.now().let { it.hour * 60 + it.minute }
-    val maxRows = NiagaraWidgetSetting.rows(context).coerceIn(1, 8)
+    val maxRows = NiagaraWidgetSetting.rows(context)
+        .coerceIn(NiagaraWidgetSetting.MIN_ROWS, NiagaraWidgetSetting.MAX_ROWS)
     val verticalPadding = 2.dp
     val startPadding = 8.dp
-    val endPadding = 40.dp
+    // Niagara 的字母索引条会盖住组件右侧；留出比之前更大的安全区。
+    val endPadding = 56.dp
     val availableHeight = (height - verticalPadding * 2).coerceAtLeast(14.dp)
     val contentWidth = (width - startPadding - endPadding).coerceAtLeast(40.dp)
     val fontScale = context.resources.configuration.fontScale.coerceAtLeast(0.5f)
@@ -145,11 +150,7 @@ private fun NiagaraTodayContent(
             Text(
                 text = if (todaySessions.isEmpty()) "今天没有课" else "今天的课已经结束",
                 style = TextStyle(
-                    fontSize = fitEmptyTextSize(
-                        contentWidth = contentWidth,
-                        rowHeight = availableHeight / maxRows.coerceAtLeast(1).toFloat(),
-                        fontScale = fontScale,
-                    ),
+                    fontSize = fitEmptyTextSize(contentWidth, availableHeight, fontScale),
                     color = ColorProvider(textColors.secondary),
                 ),
                 maxLines = 1,
@@ -157,213 +158,147 @@ private fun NiagaraTodayContent(
             return@Column
         }
 
-        val rows = remaining.map { session ->
-            NiagaraRow(
-                name = session.name,
-                meta = buildString {
-                    append("第").append(session.startPeriod)
-                    if (session.periodCount > 1) {
-                        append('-').append(session.startPeriod + session.periodCount - 1)
-                    }
-                    append("节 ")
-                    append(formatMinutes(session.startMinute))
-                    append('-')
-                    append(formatMinutes(session.endMinute))
-                    session.room?.takeIf { it.isNotBlank() }?.let {
-                        append("  ").append(it)
-                    }
-                },
-            )
-        }
+        fun toRow(session: WidgetSession) = NiagaraRow(
+            time = formatMinutes(session.startMinute),
+            name = session.name,
+            room = session.room.orEmpty(),
+        )
 
-        val (layout, visibleRows) = resolveLayout(
-            rows = rows,
-            maxRows = maxRows,
+        // 字号用“当天全部课程”测量，而不是剩余课程；下课时字号不会忽大忽小。
+        val metricRows = todaySessions.map(::toRow)
+        val displayRows = remaining.take(maxRows).map(::toRow)
+        val rowHeight = availableHeight / maxRows.toFloat()
+        val layout = buildLayout(
+            rows = metricRows,
             contentWidth = contentWidth,
-            availableHeight = availableHeight,
+            rowHeight = rowHeight,
             fontScale = fontScale,
             requestedFontSp = NiagaraWidgetSetting.fontSize(context),
         )
 
-        val rowHeight = availableHeight / visibleRows.toFloat()
-        rows.take(minOf(visibleRows, rows.size)).forEach { row ->
-            Row(
-                modifier = GlanceModifier
-                    .fillMaxWidth()
-                    .height(rowHeight),
-                verticalAlignment = Alignment.Vertical.CenterVertically,
-            ) {
-                Text(
-                    text = row.name,
-                    modifier = GlanceModifier.width(
-                        if (layout.showMeta) layout.nameWidth else contentWidth,
-                    ),
-                    style = TextStyle(
-                        fontSize = layout.nameFontSize,
-                        fontWeight = FontWeight.Bold,
-                        color = ColorProvider(textColors.primary),
-                    ),
-                    maxLines = 1,
+        // 固定显示 maxRows 行；剩余课程不足时用空行占位，保持行高与字号稳定。
+        repeat(maxRows) { index ->
+            val row = displayRows.getOrNull(index)
+            if (row == null) {
+                Spacer(
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .height(rowHeight),
                 )
-                if (layout.showMeta) {
-                    Spacer(modifier = GlanceModifier.width(layout.gap))
+            } else {
+                Row(
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .height(rowHeight),
+                    verticalAlignment = Alignment.Vertical.CenterVertically,
+                ) {
                     Text(
-                        text = row.meta,
-                        modifier = GlanceModifier.width(layout.metaWidth),
+                        text = row.time,
+                        modifier = GlanceModifier.width(layout.timeWidth),
                         style = TextStyle(
-                            fontSize = layout.metaFontSize,
+                            fontSize = layout.detailFontSize,
                             color = ColorProvider(textColors.secondary),
-                            textAlign = TextAlign.End,
                         ),
                         maxLines = 1,
                     )
+                    Spacer(modifier = GlanceModifier.width(layout.gap))
+                    Text(
+                        text = row.name,
+                        modifier = GlanceModifier.width(layout.nameWidth),
+                        style = TextStyle(
+                            fontSize = layout.nameFontSize,
+                            fontWeight = FontWeight.Bold,
+                            color = ColorProvider(textColors.primary),
+                        ),
+                        maxLines = 1,
+                    )
+                    if (layout.showRoom) {
+                        Spacer(modifier = GlanceModifier.width(layout.gap))
+                        Text(
+                            text = row.room,
+                            modifier = GlanceModifier.width(layout.roomWidth),
+                            style = TextStyle(
+                                fontSize = layout.detailFontSize,
+                                color = ColorProvider(textColors.secondary),
+                                textAlign = TextAlign.End,
+                            ),
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-private const val META_RATIO = 0.45f
+private const val DETAIL_RATIO = 0.85f
 private const val GAP_EM = 0.35f
-private const val MAX_NAME_SP = 72f
+private const val MAX_FONT_SP = 30f
+private const val FIT_SAFETY = 0.82f
+private const val MIN_DETAIL_SP = 8f
 
 /**
- * 自动模式：课程越少行越高、字越大；空间不足时减少行数。
- * 手动模式：先保证用户选择的字号，行数让位，必要时裁掉右侧说明文字。
+ * 用实际字体测量三列的最长文本，求出能完整放下的课程名字号。
+ * 说明文字取课程名的 0.85 倍；再整体乘 0.82 安全系数，宁可偏小也不裁切。
  */
-private fun resolveLayout(
+private fun buildLayout(
     rows: List<NiagaraRow>,
-    maxRows: Int,
     contentWidth: Dp,
-    availableHeight: Dp,
+    rowHeight: Dp,
     fontScale: Float,
     requestedFontSp: Int,
-): Pair<NiagaraLayout, Int> {
-    var visible = maxRows.coerceAtLeast(1)
-
-    if (requestedFontSp <= NiagaraWidgetSetting.FONT_AUTO) {
-        var layout = computeLayout(
-            rows = rows.take(visible),
-            contentWidth = contentWidth,
-            rowHeight = availableHeight / visible.toFloat(),
-            fontScale = fontScale,
-        )
-        while (visible > 1 && layout.nameFontSize.value < 11f) {
-            visible--
-            layout = computeLayout(
-                rows = rows.take(visible),
-                contentWidth = contentWidth,
-                rowHeight = availableHeight / visible.toFloat(),
-                fontScale = fontScale,
-            )
-        }
-        return layout to visible
-    }
-
-    while (visible > 1) {
-        val rowHeight = availableHeight / visible.toFloat()
-        val maxNameByHeight = rowHeight.value * 0.78f / fontScale
-        if (requestedFontSp.toFloat() <= maxNameByHeight) break
-        visible--
-    }
-    val rowHeight = availableHeight / visible.toFloat()
-    return computeManualLayout(
-        rows = rows.take(visible),
-        contentWidth = contentWidth,
-        rowHeight = rowHeight,
-        fontScale = fontScale,
-        requestedSp = requestedFontSp,
-    ) to visible
-}
-
-private fun computeManualLayout(
-    rows: List<NiagaraRow>,
-    contentWidth: Dp,
-    rowHeight: Dp,
-    fontScale: Float,
-    requestedSp: Int,
 ): NiagaraLayout {
+    val timeEm = rows.maxOfOrNull { textWidthEm(it.time, bold = false) } ?: 0.1f
     val nameEm = rows.maxOfOrNull { textWidthEm(it.name, bold = true) } ?: 1f
-    val metaEm = rows.maxOfOrNull { textWidthEm(it.meta, bold = false) } ?: 1f
-    val maxNameByWidth = contentWidth.value / (nameEm * fontScale)
-    val maxNameByHeight = rowHeight.value * 0.78f / fontScale
-    val nameFont = min(
-        requestedSp.toFloat(),
-        min(maxNameByWidth, maxNameByHeight),
-    ).coerceIn(8f, MAX_NAME_SP)
+    val roomEm = rows.maxOfOrNull { textWidthEm(it.room, bold = false) } ?: 0f
+    val showRoom = roomEm > 0f
+    val gapCount = if (showRoom) 2 else 1
+    val heightFit = (rowHeight.value * 0.62f) / fontScale
 
-    val gapDp = GAP_EM * nameFont * fontScale
-    val nameWidthDp = nameEm * nameFont * fontScale
-    val roomForMeta = (contentWidth.value - nameWidthDp - gapDp).coerceAtLeast(0f)
-    var metaFont = maxOf(requestedSp * META_RATIO, 8f)
-    if (metaEm > 0f) {
-        metaFont = min(metaFont, roomForMeta / (metaEm * fontScale))
-    }
-    val showMeta = metaEm > 0f && metaFont >= 8f && roomForMeta > 0f
-
-    return NiagaraLayout(
-        nameFontSize = nameFont.sp,
-        metaFontSize = (if (showMeta) metaFont else 0f).sp,
-        nameWidth = (if (showMeta) nameWidthDp else contentWidth.value).dp,
-        metaWidth = (if (showMeta) metaEm * metaFont * fontScale else 0f).dp,
-        gap = (if (showMeta) gapDp else 0f).dp,
-        showMeta = showMeta,
-    )
-}
-
-/**
- * 用实际字体测量最长课程名与最长说明文本，让两者在横向一起铺满组件。
- * 课程名字号为主，说明文本为其 0.45 倍；同时不超过行高。
- */
-private fun computeLayout(
-    rows: List<NiagaraRow>,
-    contentWidth: Dp,
-    rowHeight: Dp,
-    fontScale: Float,
-): NiagaraLayout {
-    val nameEm = rows.maxOfOrNull { textWidthEm(it.name, bold = true) } ?: 1f
-    val metaEm = rows.maxOfOrNull { textWidthEm(it.meta, bold = false) } ?: 1f
-    val heightFit = (rowHeight.value * 0.70f) / fontScale
-
-    var nameFont = min(
-        (contentWidth.value / (nameEm + metaEm * META_RATIO + GAP_EM).coerceAtLeast(0.1f)) /
-            fontScale * 0.97f,
-        heightFit,
-    ).coerceIn(9f, MAX_NAME_SP)
-    var metaFont = maxOf(nameFont * META_RATIO, 8f)
-    // 说明文字有 8sp 下限；把这一点算进去再迭代让整行仍能铺满。
-    repeat(3) {
-        val ratio = (metaFont / nameFont).coerceAtLeast(0.1f)
-        val totalEm = nameEm + metaEm * ratio + GAP_EM
-        nameFont = min(
-            (contentWidth.value / totalEm) / fontScale * 0.97f,
-            heightFit,
-        ).coerceIn(9f, MAX_NAME_SP)
-        metaFont = maxOf(nameFont * META_RATIO, 8f)
+    fun widthFitFor(font: Float): Float {
+        val detailRatio = maxOf(DETAIL_RATIO, MIN_DETAIL_SP / font)
+        val totalEm = timeEm * detailRatio + nameEm +
+            roomEm * detailRatio + GAP_EM * gapCount
+        return (contentWidth.value / totalEm.coerceAtLeast(0.1f)) /
+            fontScale * FIT_SAFETY
     }
 
-    val ratio = (metaFont / nameFont).coerceAtLeast(0.1f)
-    val totalEm = nameEm + metaEm * ratio + GAP_EM
+    // 先求自动可用的最大字号；手动设置只能把它再调小，不能撑破可用宽度。
+    var nameFont = MAX_FONT_SP
+    repeat(4) {
+        nameFont = min(widthFitFor(nameFont), heightFit)
+            .coerceIn(9f, MAX_FONT_SP)
+    }
+    if (requestedFontSp > NiagaraWidgetSetting.FONT_AUTO) {
+        nameFont = min(nameFont, requestedFontSp.toFloat())
+    }
+
+    val detailRatio = maxOf(DETAIL_RATIO, MIN_DETAIL_SP / nameFont)
+    val detailFont = nameFont * detailRatio
+    val totalEm = timeEm * detailRatio + nameEm +
+        roomEm * detailRatio + GAP_EM * gapCount
     val unit = contentWidth.value / totalEm.coerceAtLeast(0.1f)
+
     return NiagaraLayout(
         nameFontSize = nameFont.sp,
-        metaFontSize = metaFont.sp,
+        detailFontSize = detailFont.sp,
+        timeWidth = (unit * timeEm * detailRatio).dp,
         nameWidth = (unit * nameEm).dp,
-        metaWidth = (unit * metaEm * ratio).dp,
+        roomWidth = (unit * roomEm * detailRatio).dp,
         gap = (unit * GAP_EM).dp,
-        showMeta = true,
+        showRoom = showRoom,
     )
 }
 
 private fun fitEmptyTextSize(
     contentWidth: Dp,
-    rowHeight: Dp,
+    height: Dp,
     fontScale: Float,
 ): TextUnit {
     val em = textWidthEm("今天的课已经结束", bold = false).coerceAtLeast(1f)
-    val widthFit = (contentWidth.value / em) / fontScale * 0.95f
-    val heightFit = (rowHeight.value * 0.70f) / fontScale
-    return min(widthFit, heightFit).coerceIn(9f, MAX_NAME_SP).sp
+    val widthFit = (contentWidth.value / em) / fontScale * FIT_SAFETY
+    val heightFit = (height.value * 0.55f) / fontScale
+    return min(widthFit, heightFit).coerceIn(9f, MAX_FONT_SP).sp
 }
 
 /** 以 100px 为基准测量文字宽度，返回相对字号（em）宽度。 */

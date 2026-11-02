@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import io.github.fallasleeptimetable.widget.NiagaraWidgetSetting
 import kotlin.math.roundToInt
 
-private val fontPresets = listOf(0, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40)
+private val fontPresets = listOf(0, 12, 14, 16, 18, 20, 24, 28, 32)
 
 /**
  * 一个入口集中设置 Niagara 透明小组件：行数、字号、文字颜色。
@@ -48,14 +48,14 @@ fun NiagaraWidgetSettingsDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "显示行数：$rows 节",
+                    text = "显示课程数：$rows 节",
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Slider(
                     value = rows.toFloat(),
                     onValueChange = { rows = it.roundToInt().coerceIn(1, 8) },
-                    valueRange = 1f..8f,
-                    steps = 6,
+                    valueRange = 1f..12f,
+                    steps = 10,
                 )
 
                 Text(
@@ -91,8 +91,8 @@ fun NiagaraWidgetSettingsDialog(
                 }
 
                 Text(
-                    text = "字号「自动」会按组件宽高铺满；手动字号优先，" +
-                        "空间不足时减少行数，仍放不下则隐藏右侧说明。",
+                    text = "不足设定数量时用空行占位，避免下课后字号忽大忽小；" +
+                        "字号自动适配并留安全余量，手动只能调小。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth(),

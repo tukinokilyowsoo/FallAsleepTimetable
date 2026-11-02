@@ -153,16 +153,27 @@ class ScheduleRepository(private val db: AppDatabase) {
         timetableDao.deleteById(timetableId)
     }
 
-    suspend fun importTimetableFromText(termId: Long, text: String): ImportResult {
+    suspend fun importTimetableFromText(
+        termId: Long,
+        text: String,
+        applySettings: Boolean = false,
+    ): ImportResult {
         val term = termDao.get(termId) ?: error("还没有学期，无法导入")
         val slots = timeSlotDao.getByTerm(termId)
         val parsed = TimetableFileImporter.parse(text, term, slots)
-        return importParsedTimetable(termId, parsed)
+        return importParsedTimetable(termId, parsed, applySettings)
     }
 
-    suspend fun importParsedTimetable(termId: Long, parsed: ImportedTimetable): ImportResult {
+    suspend fun importParsedTimetable(
+        termId: Long,
+        parsed: ImportedTimetable,
+        applySettings: Boolean = false,
+    ): ImportResult {
         require(parsed.courses.isNotEmpty()) { "没有可导入的课程" }
         return db.withTransaction {
+            if (applySettings) {
+                applyImportedSettings(termId, parsed)
+            }
             val existing = timetableDao.getAll()
             val existingNames = existing.map { it.name }.toSet()
             val baseName = parsed.name.trim().ifBlank { "导入的课表" }
@@ -179,6 +190,48 @@ class ScheduleRepository(private val db: AppDatabase) {
                 timetableId = tableId,
                 courseCount = parsed.courses.size,
                 timetableName = name,
+            )
+        }
+    }
+
+    /**
+     * 把 JSON 里携带的学期设置与节次时间写回当前学期。
+     * 注意：会影响该学期下的所有课表，调用前必须由 UI 明确确认。
+     */
+    private suspend fun applyImportedSettings(termId: Long, parsed: ImportedTimetable) {
+        val term = termDao.get(termId) ?: return
+        val imported = parsed.term
+        val slots = parsed.timeSlots
+        val maxSlotPeriod = slots?.maxOfOrNull { it.period } ?: 0
+        val periods = maxOf(
+            term.periodsPerDay,
+            imported?.periodsPerDay ?: 0,
+            maxSlotPeriod,
+        ).coerceIn(1, 30)
+
+        val startDate = (imported?.startDateEpochDay ?: term.startDateEpochDay)
+            .coerceIn(MIN_EPOCH_DAY, MAX_EPOCH_DAY)
+        termDao.update(
+            term.copy(
+                startDateEpochDay = startDate,
+                totalWeeks = (imported?.totalWeeks ?: term.totalWeeks).coerceIn(1, 60),
+                periodsPerDay = periods,
+                showSaturday = imported?.showSaturday ?: term.showSaturday,
+                showSunday = imported?.showSunday ?: term.showSunday,
+            ),
+        )
+
+        if (!slots.isNullOrEmpty()) {
+            timeSlotDao.deleteByTerm(termId)
+            timeSlotDao.insertAll(
+                slots.map { slot ->
+                    TimeSlotEntity(
+                        termId = termId,
+                        period = slot.period,
+                        startMinute = slot.startMinute,
+                        endMinute = slot.endMinute,
+                    )
+                },
             )
         }
     }
@@ -260,6 +313,12 @@ class ScheduleRepository(private val db: AppDatabase) {
         val color: Int,
         val parity: Int,
     )
+
+    private companion object {
+        // 2000-01-01 .. 2100-12-31，避免损坏文件写入荒唐日期
+        const val MIN_EPOCH_DAY = 10957L
+        const val MAX_EPOCH_DAY = 47847L
+    }
 
     private fun defaultTimeSlots(termId: Long, periods: IntRange): List<TimeSlotEntity> {
         val times = listOf(

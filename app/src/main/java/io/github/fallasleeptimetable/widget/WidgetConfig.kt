@@ -13,7 +13,7 @@ data class WidgetConfig(
 /** Niagara 透明今日课程组件：全局纵向显示行数与文字颜色。 */
 object NiagaraWidgetSetting {
     const val MIN_ROWS = 1
-    const val MAX_ROWS = 8
+    const val MAX_ROWS = 12
     const val DEFAULT_ROWS = 4
 
     const val TEXT_AUTO = "auto"
@@ -22,10 +22,10 @@ object NiagaraWidgetSetting {
 
     const val FONT_AUTO = 0
     const val MIN_FONT_SP = 10
-    const val MAX_FONT_SP = 40
+    const val MAX_FONT_SP = 32
 
     private const val PREFS = "settings"
-    private const val KEY_ROWS = "niagara_rows"
+    private const val KEY_ROWS = "niagara_display_count"
     private const val KEY_TEXT_COLOR = "niagara_text_color"
     private const val KEY_FONT_SIZE = "niagara_font_size"
 

@@ -72,6 +72,8 @@ import io.github.fallasleeptimetable.R
 import io.github.fallasleeptimetable.data.TermEntity
 import io.github.fallasleeptimetable.data.calendar.CalendarScheduleExporter
 import io.github.fallasleeptimetable.data.diagnostics.ImportLog
+import io.github.fallasleeptimetable.data.importer.ImportSettingsSummary
+import io.github.fallasleeptimetable.data.importer.TimetableImporter
 import io.github.fallasleeptimetable.data.share.ScheduleImageExporter
 import io.github.fallasleeptimetable.data.share.ShareLauncher
 import io.github.fallasleeptimetable.data.TimetableEntity
@@ -105,7 +107,7 @@ fun SettingsScreen(
     onExportTimetable: () -> String?,
     onExportIcs: () -> String?,
     onExportCsv: () -> String?,
-    onImportTimetable: (String) -> Unit,
+    onImportTimetable: (String, Boolean) -> Unit,
     message: String?,
     onConsumeMessage: () -> Unit,
 ) {
@@ -124,6 +126,9 @@ fun SettingsScreen(
     var deleteAllCalendarConfirm by remember { mutableStateOf(false) }
     var showShareImage by remember { mutableStateOf(false) }
     var shareBusy by remember { mutableStateOf(false) }
+    var pendingImport by remember {
+        mutableStateOf<Pair<String, ImportSettingsSummary>?>(null)
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var widgetTheme by remember { mutableStateOf(WidgetThemeSetting.get(context)) }
@@ -329,7 +334,12 @@ fun SettingsScreen(
                 null
             }
             if (text != null) {
-                onImportTimetable(text)
+                val summary = TimetableImporter.inspect(text)
+                if (summary != null) {
+                    pendingImport = text to summary
+                } else {
+                    onImportTimetable(text, false)
+                }
             }
         }
     }
@@ -453,7 +463,7 @@ fun SettingsScreen(
                     headlineContent = { Text("Niagara 小组件") },
                     supportingContent = {
                         Text(
-                            "行数 $niagaraRows · 字号 " +
+                            "显示 $niagaraRows 节 · 字号 " +
                                 NiagaraWidgetSetting.fontSizeLabel(niagaraFontSize) +
                                 " · 文字 " +
                                 NiagaraWidgetSetting.textColorLabel(niagaraTextColor),
@@ -942,6 +952,49 @@ fun SettingsScreen(
                             },
                         )
                     }
+                }
+            },
+        )
+    }
+
+    pendingImport?.let { (text, summary) ->
+        val details = buildList {
+            summary.startDateEpochDay?.let {
+                add("开学日期 ${LocalDate.ofEpochDay(it).format(settingsDateFormat)}")
+            }
+            summary.totalWeeks?.let { add("总周数 $it 周") }
+            summary.periodsPerDay?.let { add("每天 $it 节") }
+            if (summary.timeSlotCount > 0) {
+                add("节次时间 ${summary.timeSlotCount} 条")
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { pendingImport = null },
+            title = { Text("一并恢复学期设置？") },
+            text = {
+                Text(
+                    "这份 JSON 还包含：\n" + details.joinToString("\n") +
+                        "\n\n恢复会覆盖当前学期（以及该学期下所有课表）共用的" +
+                        "开学日期、周数和上课时间。",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingImport = null
+                        onImportTimetable(text, true)
+                    },
+                ) { Text("一并恢复") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { pendingImport = null }) { Text("取消") }
+                    TextButton(
+                        onClick = {
+                            pendingImport = null
+                            onImportTimetable(text, false)
+                        },
+                    ) { Text("仅导入课程") }
                 }
             },
         )

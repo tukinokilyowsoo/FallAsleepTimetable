@@ -12,7 +12,39 @@ import kotlin.math.absoluteValue
 data class ImportedTimetable(
     val name: String,
     val courses: List<ImportedCourse>,
+    val term: ImportedTerm? = null,
+    val timeSlots: List<ImportedTimeSlot>? = null,
 )
+
+/** FallAsleep JSON 里可选的学期设置；为 null 表示文件没有该字段。 */
+data class ImportedTerm(
+    val startDateEpochDay: Long? = null,
+    val totalWeeks: Int? = null,
+    val periodsPerDay: Int? = null,
+    val showSaturday: Boolean? = null,
+    val showSunday: Boolean? = null,
+)
+
+data class ImportedTimeSlot(
+    val period: Int,
+    val startMinute: Int,
+    val endMinute: Int,
+)
+
+/** 导入前预览：这份文件是否携带可覆盖当前学期的设置。 */
+data class ImportSettingsSummary(
+    val startDateEpochDay: Long? = null,
+    val totalWeeks: Int? = null,
+    val periodsPerDay: Int? = null,
+    val showSaturday: Boolean? = null,
+    val showSunday: Boolean? = null,
+    val timeSlotCount: Int = 0,
+) {
+    val hasSettings: Boolean
+        get() = startDateEpochDay != null || totalWeeks != null ||
+            periodsPerDay != null || showSaturday != null ||
+            showSunday != null || timeSlotCount > 0
+}
 
 data class ImportedCourse(
     val name: String,
@@ -157,8 +189,61 @@ object TimetableImporter {
                 )
             }
         }
-        return ImportedTimetable(name = name, courses = courses)
+        val termJson = root.optJSONObject("term")
+        val importedTerm = termJson?.let { term ->
+            ImportedTerm(
+                startDateEpochDay = term.optLongOrNull("startDateEpochDay"),
+                totalWeeks = term.optIntOrNull("totalWeeks"),
+                periodsPerDay = term.optIntOrNull("periodsPerDay"),
+                showSaturday = term.optBooleanOrNull("showSaturday"),
+                showSunday = term.optBooleanOrNull("showSunday"),
+            )
+        }
+
+        val slots = buildList {
+            val slotsArray = root.optJSONArray("timeSlots") ?: JSONArray()
+            for (index in 0 until slotsArray.length()) {
+                val json = slotsArray.optJSONObject(index) ?: continue
+                val period = json.optInt("period", 0)
+                val start = json.optInt("startMinute", -1)
+                val end = json.optInt("endMinute", -1)
+                if (period in 1..30 && start in 0 until end && end <= 24 * 60) {
+                    add(ImportedTimeSlot(period, start, end))
+                }
+            }
+        }.sortedBy { it.period }.takeIf { it.isNotEmpty() }
+
+        return ImportedTimetable(
+            name = name,
+            courses = courses,
+            term = importedTerm?.takeIf { it.hasAnyValue() },
+            timeSlots = slots,
+        )
     }
+
+    /**
+     * 导入前检查 JSON 是否携带学期设置/节次时间。
+     * 只对 FallAsleep JSON 生效；CSV/ICS/旧格式返回 null。
+     */
+    fun inspect(text: String): ImportSettingsSummary? {
+        val root = runCatching { JSONObject(text.trim()) }.getOrNull() ?: return null
+        if (!root.has("courses")) return null
+        val parsed = runCatching { parseBackup(root) }.getOrNull() ?: return null
+        val term = parsed.term
+        val summary = ImportSettingsSummary(
+            startDateEpochDay = term?.startDateEpochDay,
+            totalWeeks = term?.totalWeeks,
+            periodsPerDay = term?.periodsPerDay,
+            showSaturday = term?.showSaturday,
+            showSunday = term?.showSunday,
+            timeSlotCount = parsed.timeSlots?.size ?: 0,
+        )
+        return summary.takeIf { it.hasSettings }
+    }
+
+    private fun ImportedTerm.hasAnyValue(): Boolean =
+        startDateEpochDay != null || totalWeeks != null ||
+            periodsPerDay != null || showSaturday != null || showSunday != null
 
     /**
      * 旧版 WakeUp 课程表的 .wakeup_schedule：5 行 JSON，依次是
@@ -220,4 +305,13 @@ object TimetableImporter {
     }
 
     private fun normalizeColor(value: Int): Int = ((value % 6) + 6) % 6
+
+    private fun JSONObject.optLongOrNull(key: String): Long? =
+        if (has(key) && !isNull(key)) optLong(key) else null
+
+    private fun JSONObject.optIntOrNull(key: String): Int? =
+        if (has(key) && !isNull(key)) optInt(key) else null
+
+    private fun JSONObject.optBooleanOrNull(key: String): Boolean? =
+        if (has(key) && !isNull(key)) optBoolean(key) else null
 }
