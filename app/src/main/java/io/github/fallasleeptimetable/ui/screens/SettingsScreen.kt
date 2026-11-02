@@ -129,6 +129,9 @@ fun SettingsScreen(
     var pendingImport by remember {
         mutableStateOf<Pair<String, ImportSettingsSummary>?>(null)
     }
+    var showLicenseDialog by remember { mutableStateOf(false) }
+    var showThirdPartyNotices by remember { mutableStateOf(false) }
+    var showPrivacyPolicy by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var widgetTheme by remember { mutableStateOf(WidgetThemeSetting.get(context)) }
@@ -743,6 +746,32 @@ fun SettingsScreen(
                     leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
                 )
             }
+            item {
+                ListItem(
+                    headlineContent = { Text("许可证") },
+                    supportingContent = {
+                        Text("PolyForm Noncommercial 1.0.0 · 禁止商业使用")
+                    },
+                    leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
+                    modifier = Modifier.clickable { showLicenseDialog = true },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("第三方依赖") },
+                    supportingContent = { Text("开源组件、版本与许可证全文") },
+                    leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
+                    modifier = Modifier.clickable { showThirdPartyNotices = true },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("隐私政策") },
+                    supportingContent = { Text("本地数据、权限与教务导入说明") },
+                    leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
+                    modifier = Modifier.clickable { showPrivacyPolicy = true },
+                )
+            }
             item { Spacer(modifier = Modifier.width(1.dp).padding(bottom = 16.dp)) }
         }
     }
@@ -997,6 +1026,27 @@ fun SettingsScreen(
                     ) { Text("仅导入课程") }
                 }
             },
+        )
+    }
+
+    if (showLicenseDialog) {
+        LicenseDialog(
+            context = context,
+            onDismiss = { showLicenseDialog = false },
+        )
+    }
+
+    if (showThirdPartyNotices) {
+        ThirdPartyNoticesDialog(
+            context = context,
+            onDismiss = { showThirdPartyNotices = false },
+        )
+    }
+
+    if (showPrivacyPolicy) {
+        PrivacyPolicyDialog(
+            context = context,
+            onDismiss = { showPrivacyPolicy = false },
         )
     }
 

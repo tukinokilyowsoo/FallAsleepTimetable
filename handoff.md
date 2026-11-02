@@ -1,7 +1,7 @@
 # FallAsleep 课程表 · 交接文档
 
 > 更新日期：2026-11-02
-> 当前版本：`0.5.3-beta`（versionCode 9）
+> 当前版本：`0.5.7-beta`（versionCode 13）
 > 仓库：https://github.com/tukinokilyowsoo/FallAsleepTimetable
 
 ---
@@ -15,6 +15,8 @@
 - minSdk 26（Android 8），compileSdk / targetSdk 36
 - 技术栈：Kotlin + Jetpack Compose + Material 3、Room、Glance、jsoup
 - 项目性质：个人项目；许可证为 **PolyForm Noncommercial 1.0.0**（源码可见，禁止商业使用）
+- 第三方依赖声明：`THIRD-PARTY-NOTICES.md`（含 Apache-2.0 / MIT / BSD-3-Clause 全文，并随 APK 打包）
+- 隐私政策：`PRIVACY.md`（说明本地数据、权限、教务导入与删除方式；已关闭系统备份与设备迁移）
 
 ---
 
@@ -224,7 +226,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 6. 尚未实现 App 内上课提醒（目前走系统日历提醒）。
 7. 尚未实现多学期、自动备份、时间模板、英文界面。
 8. 自定义主题色为 HSV 近似 M3，不是完整 HCT 色调板。
-9. 许可证已补为 PolyForm Noncommercial 1.0.0；上架前仍需隐私政策与商店材料。
+9. 许可证、第三方依赖声明、隐私政策已补；上架前仍需商店文案、图标/截图与签名密钥托管。
 10. `namespace` 与 `applicationId` 不同，改包名/签名需同时评估数据迁移。
 
 ---
