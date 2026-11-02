@@ -62,6 +62,12 @@ app/src/main/java/io/github/fallasleeptimetable/
 
 更多：课程详情、今日页、设置、学期设置见 `docs/screenshots/`。
 
-## 说明
+## 许可证
 
-- 仓库目前**没有 LICENSE**，意为保留所有权利；确定许可证后会补充。
+本项目采用 [PolyForm Noncommercial License 1.0.0](LICENSE)：
+
+- 允许个人学习、研究、测试、业余项目等**非商业用途**；
+- 允许非商业性的修改与分发，但分发时必须附带许可证文本与 Required Notice；
+- **不允许商业使用**；如需商业授权，请通过仓库 Issues 联系作者。
+
+> 这不是 OSI 认可的开源许可证，GitHub 会将其标记为 "View license / Other"。

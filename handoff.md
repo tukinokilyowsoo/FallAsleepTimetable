@@ -14,7 +14,7 @@
 - 源码 namespace：`io.github.fallasleeptimetable`（与包名不同，历史原因，勿随意改）
 - minSdk 26（Android 8），compileSdk / targetSdk 36
 - 技术栈：Kotlin + Jetpack Compose + Material 3、Room、Glance、jsoup
-- 项目性质：个人项目；仓库暂无 LICENSE（保留所有权利）
+- 项目性质：个人项目；许可证为 **PolyForm Noncommercial 1.0.0**（源码可见，禁止商业使用）
 
 ---
 
@@ -224,7 +224,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 6. 尚未实现 App 内上课提醒（目前走系统日历提醒）。
 7. 尚未实现多学期、自动备份、时间模板、英文界面。
 8. 自定义主题色为 HSV 近似 M3，不是完整 HCT 色调板。
-9. 仓库暂无 LICENSE；上架前需补许可证、隐私政策与商店材料。
+9. 许可证已补为 PolyForm Noncommercial 1.0.0；上架前仍需隐私政策与商店材料。
 10. `namespace` 与 `applicationId` 不同，改包名/签名需同时评估数据迁移。
 
 ---
