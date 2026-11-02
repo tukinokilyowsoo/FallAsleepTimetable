@@ -9,6 +9,7 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
@@ -34,7 +35,8 @@ class WeekScheduleWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = WidgetDataLoader.load(context)
+        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+        val data = WidgetDataLoader.load(context, appWidgetId)
         provideContent {
             val size = LocalSize.current
             WeekScheduleContent(context, data, size.width, size.height)
@@ -44,6 +46,11 @@ class WeekScheduleWidget : GlanceAppWidget() {
 
 class WeekScheduleWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = WeekScheduleWidget()
+
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        appWidgetIds.forEach { WidgetConfigStore.delete(context, it) }
+    }
 }
 
 @Composable
@@ -172,16 +179,36 @@ private fun WeekScheduleContent(
                                                 .cornerRadius(6.dp)
                                                 .padding(2.dp),
                                         ) {
-                                            Text(
-                                                text = session.name,
-                                                style = TextStyle(
-                                                    fontSize = 8.sp,
-                                                    color = ColorProvider(
-                                                        palette.onContainers[colorIndex],
+                                            Column {
+                                                Text(
+                                                    text = session.name,
+                                                    style = TextStyle(
+                                                        fontSize = 8.sp,
+                                                        color = ColorProvider(
+                                                            palette.onContainers[colorIndex],
+                                                        ),
                                                     ),
-                                                ),
-                                                maxLines = 6,
-                                            )
+                                                    maxLines = 6,
+                                                )
+                                                if (data.config.showRoom) {
+                                                    session.room
+                                                        ?.takeIf { it.isNotBlank() }
+                                                        ?.let { room ->
+                                                            Text(
+                                                                text = room,
+                                                                style = TextStyle(
+                                                                    fontSize = 7.sp,
+                                                                    color = ColorProvider(
+                                                                        palette.onContainers[
+                                                                            colorIndex
+                                                                        ],
+                                                                    ),
+                                                                ),
+                                                                maxLines = 1,
+                                                            )
+                                                        }
+                                                }
+                                            }
                                         }
                                         cursor = session.startPeriod + session.periodCount
                                     }

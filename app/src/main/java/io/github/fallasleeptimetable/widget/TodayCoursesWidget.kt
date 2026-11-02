@@ -10,6 +10,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
@@ -36,13 +37,18 @@ class TodayCoursesWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = WidgetDataLoader.load(context)
+        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+        val data = WidgetDataLoader.load(context, appWidgetId)
         provideContent {
             val width = LocalSize.current.width
-            val dayCount = when {
-                width < 240.dp -> 1
-                width < 380.dp -> 2
-                else -> 3
+            val dayCount = if (data != null && !data.config.showUpcomingDays) {
+                1
+            } else {
+                when {
+                    width < 240.dp -> 1
+                    width < 380.dp -> 2
+                    else -> 3
+                }
             }
             TodayCoursesContent(context, data, dayCount)
         }
@@ -51,6 +57,11 @@ class TodayCoursesWidget : GlanceAppWidget() {
 
 class TodayCoursesWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = TodayCoursesWidget()
+
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        appWidgetIds.forEach { WidgetConfigStore.delete(context, it) }
+    }
 }
 
 @Composable
@@ -162,8 +173,8 @@ private fun TodayCoursesContent(
                                         maxLines = if (dayCount == 1) 2 else 3,
                                     )
                                     val detail = listOfNotNull(
-                                        session.room,
-                                        session.teacher,
+                                        session.room.takeIf { data.config.showRoom },
+                                        session.teacher.takeIf { data.config.showTeacher },
                                     ).joinToString(" · ")
                                     if (detail.isNotBlank()) {
                                         Text(

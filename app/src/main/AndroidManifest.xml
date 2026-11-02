@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="true"
@@ -40,6 +42,38 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <activity
+            android:name=".ui.widget.TodayWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FallAsleep">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.widget.WeekWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FallAsleep">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".widget.WidgetRefreshReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.WALLPAPER_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".widget.TodayCoursesWidgetReceiver"
             android:exported="false"
@@ -62,6 +96,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/week_schedule_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.NiagaraTodayWidgetReceiver"
+            android:exported="false"
+            android:label="今日课程（透明）">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/niagara_today_widget_info" />
         </receiver>
     </application>
 

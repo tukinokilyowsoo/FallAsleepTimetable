@@ -84,6 +84,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -644,6 +648,7 @@ private fun DayColumn(
 
         Column(modifier = Modifier.matchParentSize()) {
             repeat(periods) { index ->
+                val period = index + 1
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -651,7 +656,12 @@ private fun DayColumn(
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                        ) { onEmptyClick(index + 1) },
+                        ) { onEmptyClick(period) }
+                        .semantics {
+                            contentDescription =
+                                "${dayLabel(day)}第 $period 节，添加课程"
+                            role = Role.Button
+                        },
                 )
             }
         }
@@ -660,6 +670,19 @@ private fun DayColumn(
             val lane = lanes[session.sessionId] ?: 0
             val colors = courseColors(session.colorIndex)
             val blockWidth = dayWidth / laneCount
+            val description = buildString {
+                append(session.name)
+                append("，").append(dayLabel(session.dayOfWeek))
+                append(" ").append(periodLabel(session.startPeriod, session.periodCount))
+                append("，")
+                append(weekRangeLabel(session.startWeek, session.endWeek, session.parity))
+                session.room?.takeIf { it.isNotBlank() }?.let {
+                    append("，").append(it)
+                }
+                session.teacher?.takeIf { it.isNotBlank() }?.let {
+                    append("，").append(it)
+                }
+            }
             Box(
                 modifier = Modifier
                     .offset(
@@ -672,6 +695,10 @@ private fun DayColumn(
                     .clip(RoundedCornerShape(10.dp))
                     .background(colors.container)
                     .clickable { onSessionClick(session) }
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = description
+                        role = Role.Button
+                    }
                     .padding(
                         horizontal = if (compact) 3.dp else 6.dp,
                         vertical = if (compact) 2.dp else 4.dp,
@@ -766,12 +793,36 @@ private fun WeekOverview(
                         val finished = state.isCurrentWeek &&
                             endSlot != null &&
                             nowMinutes >= endSlot.endMinute
+                        val description = buildString {
+                            append(session.name)
+                            append("，").append(dayLabel(session.dayOfWeek))
+                            append(" ")
+                            append(periodLabel(session.startPeriod, session.periodCount))
+                            append("，")
+                            append(
+                                weekRangeLabel(
+                                    session.startWeek,
+                                    session.endWeek,
+                                    session.parity,
+                                ),
+                            )
+                            session.room?.takeIf { it.isNotBlank() }?.let {
+                                append("，").append(it)
+                            }
+                            session.teacher?.takeIf { it.isNotBlank() }?.let {
+                                append("，").append(it)
+                            }
+                        }
 
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(MaterialTheme.shapes.medium)
                                 .clickable { onSessionClick(session) }
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = description
+                                    role = Role.Button
+                                }
                                 .padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {

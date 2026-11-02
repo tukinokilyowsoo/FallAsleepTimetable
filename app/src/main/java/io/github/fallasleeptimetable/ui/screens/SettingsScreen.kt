@@ -1,9 +1,11 @@
 package io.github.fallasleeptimetable.ui.screens
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -74,6 +76,8 @@ import io.github.fallasleeptimetable.data.share.ScheduleImageExporter
 import io.github.fallasleeptimetable.data.share.ShareLauncher
 import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.ui.ScheduleUiState
+import io.github.fallasleeptimetable.widget.NiagaraWidgetSetting
+import io.github.fallasleeptimetable.widget.WidgetRefreshScheduler
 import io.github.fallasleeptimetable.widget.WidgetThemeSetting
 import io.github.fallasleeptimetable.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
@@ -123,6 +127,14 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var widgetTheme by remember { mutableStateOf(WidgetThemeSetting.get(context)) }
+    var niagaraRows by remember { mutableStateOf(NiagaraWidgetSetting.rows(context)) }
+    var niagaraTextColor by remember {
+        mutableStateOf(NiagaraWidgetSetting.textColor(context))
+    }
+    var niagaraFontSize by remember {
+        mutableStateOf(NiagaraWidgetSetting.fontSize(context))
+    }
+    var showNiagaraSettings by remember { mutableStateOf(false) }
 
     fun applyWidgetTheme(value: String) {
         WidgetThemeSetting.set(context, value)
@@ -431,6 +443,63 @@ fun SettingsScreen(
                                         },
                                     )
                                 }
+                            }
+                        }
+                    },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Niagara 小组件") },
+                    supportingContent = {
+                        Text(
+                            "行数 $niagaraRows · 字号 " +
+                                NiagaraWidgetSetting.fontSizeLabel(niagaraFontSize) +
+                                " · 文字 " +
+                                NiagaraWidgetSetting.textColorLabel(niagaraTextColor),
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_palette),
+                            contentDescription = null,
+                        )
+                    },
+                    trailingContent = {
+                        TextButton(onClick = { showNiagaraSettings = true }) {
+                            Text("设置")
+                        }
+                    },
+                    modifier = Modifier.clickable { showNiagaraSettings = true },
+                )
+            }
+            item {
+                val exactAllowed = WidgetRefreshScheduler.canScheduleExact(context)
+                ListItem(
+                    headlineContent = { Text("下课准时刷新") },
+                    supportingContent = {
+                        Text(
+                            if (exactAllowed) {
+                                "已允许精确闹钟，课程结束后 1 分钟内刷新"
+                            } else {
+                                "未授权精确闹钟；点此前往系统设置允许「闹钟和提醒」"
+                            },
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+                    modifier = Modifier.clickable {
+                        if (exactAllowed) {
+                            localMessage = "已允许精确闹钟，小组件会在下课后刷新"
+                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(
+                                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                        Uri.parse("package:${context.packageName}"),
+                                    ),
+                                )
+                            }.onFailure {
+                                localMessage = "无法打开授权页面，请在系统设置中允许「闹钟和提醒」"
                             }
                         }
                     },
@@ -874,6 +943,25 @@ fun SettingsScreen(
                         )
                     }
                 }
+            },
+        )
+    }
+
+    if (showNiagaraSettings) {
+        NiagaraWidgetSettingsDialog(
+            initialRows = niagaraRows,
+            initialFontSize = niagaraFontSize,
+            initialTextColor = niagaraTextColor,
+            onDismiss = { showNiagaraSettings = false },
+            onApply = { rows, fontSize, textColor ->
+                NiagaraWidgetSetting.setRows(context, rows)
+                NiagaraWidgetSetting.setFontSize(context, fontSize)
+                NiagaraWidgetSetting.setTextColor(context, textColor)
+                niagaraRows = rows
+                niagaraFontSize = fontSize
+                niagaraTextColor = textColor
+                WidgetUpdater.updateAll(context)
+                showNiagaraSettings = false
             },
         )
     }
