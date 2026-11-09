@@ -100,17 +100,6 @@
                 android:resource="@xml/week_schedule_widget_info" />
         </receiver>
 
-        <receiver
-            android:name=".widget.NiagaraTodayWidgetReceiver"
-            android:exported="false"
-            android:label="今日课程*针对Niagara优化">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/niagara_today_widget_info" />
-        </receiver>
     </application>
 
 </manifest>

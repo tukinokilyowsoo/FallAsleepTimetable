@@ -78,7 +78,6 @@ import io.github.fallasleeptimetable.data.share.ScheduleImageExporter
 import io.github.fallasleeptimetable.data.share.ShareLauncher
 import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.ui.ScheduleUiState
-import io.github.fallasleeptimetable.widget.NiagaraWidgetSetting
 import io.github.fallasleeptimetable.widget.WidgetRefreshScheduler
 import io.github.fallasleeptimetable.widget.WidgetThemeSetting
 import io.github.fallasleeptimetable.widget.WidgetUpdater
@@ -98,6 +97,8 @@ fun SettingsScreen(
     onDynamicColorChange: (Boolean) -> Unit,
     customColorArgb: Long?,
     onCustomColorPicked: (Long) -> Unit,
+    hideStatusBar: Boolean,
+    onHideStatusBarChange: (Boolean) -> Unit,
     onUpdateTerm: (TermEntity) -> Unit,
     onUpdateTimeSlots: (Int, List<Pair<Int, Int>>) -> Unit,
     onSelectTimetable: (Long) -> Unit,
@@ -135,15 +136,6 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var widgetTheme by remember { mutableStateOf(WidgetThemeSetting.get(context)) }
-    var niagaraRows by remember { mutableStateOf(NiagaraWidgetSetting.rows(context)) }
-    var niagaraTextColor by remember {
-        mutableStateOf(NiagaraWidgetSetting.textColor(context))
-    }
-    var niagaraFontSize by remember {
-        mutableStateOf(NiagaraWidgetSetting.fontSize(context))
-    }
-    var showNiagaraSettings by remember { mutableStateOf(false) }
-
     fun applyWidgetTheme(value: String) {
         WidgetThemeSetting.set(context, value)
         widgetTheme = value
@@ -411,6 +403,24 @@ fun SettingsScreen(
                     modifier = Modifier.clickable { showThemeColorDialog = true },
                 )
             }
+            item {
+                ListItem(
+                    headlineContent = { Text("隐藏状态栏") },
+                    supportingContent = { Text("隐藏顶部状态栏，保留底部手势条") },
+                    leadingContent = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_fullscreen),
+                            contentDescription = null,
+                        )
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = hideStatusBar,
+                            onCheckedChange = onHideStatusBarChange,
+                        )
+                    },
+                )
+            }
             item { HorizontalDivider() }
 
             item { SectionHeader("小组件") }
@@ -459,31 +469,6 @@ fun SettingsScreen(
                             }
                         }
                     },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Niagara 小组件") },
-                    supportingContent = {
-                        Text(
-                            "显示 $niagaraRows 节 · 字号 " +
-                                NiagaraWidgetSetting.fontSizeLabel(niagaraFontSize) +
-                                " · 文字 " +
-                                NiagaraWidgetSetting.textColorLabel(niagaraTextColor),
-                        )
-                    },
-                    leadingContent = {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_palette),
-                            contentDescription = null,
-                        )
-                    },
-                    trailingContent = {
-                        TextButton(onClick = { showNiagaraSettings = true }) {
-                            Text("设置")
-                        }
-                    },
-                    modifier = Modifier.clickable { showNiagaraSettings = true },
                 )
             }
             item {
@@ -1047,25 +1032,6 @@ fun SettingsScreen(
         PrivacyPolicyDialog(
             context = context,
             onDismiss = { showPrivacyPolicy = false },
-        )
-    }
-
-    if (showNiagaraSettings) {
-        NiagaraWidgetSettingsDialog(
-            initialRows = niagaraRows,
-            initialFontSize = niagaraFontSize,
-            initialTextColor = niagaraTextColor,
-            onDismiss = { showNiagaraSettings = false },
-            onApply = { rows, fontSize, textColor ->
-                NiagaraWidgetSetting.setRows(context, rows)
-                NiagaraWidgetSetting.setFontSize(context, fontSize)
-                NiagaraWidgetSetting.setTextColor(context, textColor)
-                niagaraRows = rows
-                niagaraFontSize = fontSize
-                niagaraTextColor = textColor
-                WidgetUpdater.updateAll(context)
-                showNiagaraSettings = false
-            },
         )
     }
 

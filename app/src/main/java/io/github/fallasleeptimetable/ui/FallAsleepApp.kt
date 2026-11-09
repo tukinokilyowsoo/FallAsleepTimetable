@@ -4,7 +4,12 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -41,12 +46,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -67,6 +75,7 @@ import io.github.fallasleeptimetable.ui.screens.ScheduleScreen
 import io.github.fallasleeptimetable.ui.screens.SettingsScreen
 import io.github.fallasleeptimetable.ui.screens.TimetablePickerDialog
 import io.github.fallasleeptimetable.ui.screens.TodayScreen
+import kotlinx.coroutines.delay
 
 private enum class AppDestination(
     @StringRes val labelRes: Int,
@@ -83,6 +92,8 @@ fun FallAsleepApp(
     onDynamicColorChange: (Boolean) -> Unit,
     customColorArgb: Long?,
     onCustomColorPicked: (Long) -> Unit,
+    hideStatusBar: Boolean,
+    onHideStatusBarChange: (Boolean) -> Unit,
 ) {
     val scheduleViewModel: ScheduleViewModel = viewModel()
     val state by scheduleViewModel.uiState.collectAsStateWithLifecycle()
@@ -99,11 +110,43 @@ fun FallAsleepApp(
     var showEduUrlDialog by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<Pair<Long, String>?>(null) }
     var fullscreen by rememberSaveable { mutableStateOf(false) }
+    var backProgress by remember { mutableFloatStateOf(0f) }
 
-    BackHandler(enabled = fullscreen) { fullscreen = false }
+    // 预测式返回：全屏时退出全屏；在「今日/设置」时回到「课表」。
+    // 手势过程中按进度位移、淡出当前页面，取消则自动回弹。
+    PredictiveBackHandler(
+        enabled = fullscreen || destination != AppDestination.Schedule,
+    ) { progress ->
+        var completed = false
+        try {
+            progress.collect { event ->
+                backProgress = event.progress
+            }
+            completed = true
+            if (fullscreen) {
+                fullscreen = false
+            } else {
+                destination = AppDestination.Schedule
+            }
+        } finally {
+            // 取消时立即回弹；完成时保留当前进度，让上层按滑开位置淡出，
+            // 避免复位瞬间把页面弹回盖住课表造成闪烁。
+            if (!completed) {
+                backProgress = 0f
+            }
+        }
+    }
+
+    // 退出动画结束后再把预测进度归零（包括全屏返回后 destination 不变的情况）。
+    LaunchedEffect(destination, fullscreen) {
+        if (!fullscreen && destination == AppDestination.Schedule && backProgress > 0f) {
+            delay(240)
+            backProgress = 0f
+        }
+    }
 
     val view = LocalView.current
-    DisposableEffect(fullscreen) {
+    DisposableEffect(fullscreen, hideStatusBar) {
         val controller = view.context.findActivity()?.window?.let { window ->
             WindowCompat.getInsetsController(window, view)
         }
@@ -113,8 +156,24 @@ fun FallAsleepApp(
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 controller.hide(WindowInsetsCompat.Type.systemBars())
             } else {
-                controller.show(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+                if (hideStatusBar) {
+                    controller.hide(WindowInsetsCompat.Type.statusBars())
+                } else {
+                    controller.show(WindowInsetsCompat.Type.statusBars())
+                }
+                controller.show(WindowInsetsCompat.Type.navigationBars())
             }
+        }
+        onDispose { /* 系统栏的真正恢复交给下面的 DisposableEffect(view) */ }
+    }
+
+    // 只有离开本组合时才恢复全部系统栏；切换全屏/开关时不要在 onDispose
+    // 里先 show 一遍，否则退出全屏会闪一下状态栏。
+    DisposableEffect(view) {
+        val controller = view.context.findActivity()?.window?.let { window ->
+            WindowCompat.getInsetsController(window, view)
         }
         onDispose {
             controller?.show(WindowInsetsCompat.Type.systemBars())
@@ -169,10 +228,13 @@ fun FallAsleepApp(
                         onCreateTimetableRequest = { showCreateTimetable = true },
                         message = message,
                         onConsumeMessage = scheduleViewModel::consumeMessage,
+                        hideStatusBar = hideStatusBar,
+                        onHideStatusBarChange = onHideStatusBarChange,
                         searchQuery = searchQuery,
                         searchResults = searchResults,
                         onSearchCourses = scheduleViewModel::searchCourses,
                         onSearchResultClick = scheduleViewModel::jumpToSearchResult,
+                        backProgress = backProgress,
                     )
                 }
                 if (!fullscreen) {
@@ -230,10 +292,13 @@ fun FallAsleepApp(
                         onCreateTimetableRequest = { showCreateTimetable = true },
                         message = message,
                         onConsumeMessage = scheduleViewModel::consumeMessage,
+                        hideStatusBar = hideStatusBar,
+                        onHideStatusBarChange = onHideStatusBarChange,
                         searchQuery = searchQuery,
                         searchResults = searchResults,
                         onSearchCourses = scheduleViewModel::searchCourses,
                         onSearchResultClick = scheduleViewModel::jumpToSearchResult,
+                        backProgress = backProgress,
                     )
                 }
             }
@@ -460,13 +525,16 @@ private fun AppContent(
     onCreateTimetableRequest: () -> Unit,
     message: String?,
     onConsumeMessage: () -> Unit,
+    hideStatusBar: Boolean,
+    onHideStatusBarChange: (Boolean) -> Unit,
     searchQuery: String,
     searchResults: List<CourseSearchRow>,
     onSearchCourses: (String) -> Unit,
     onSearchResultClick: (CourseSearchRow) -> Unit,
+    backProgress: Float,
 ) {
-    when (destination) {
-        AppDestination.Schedule -> ScheduleScreen(
+    val scheduleContent: @Composable () -> Unit = {
+        ScheduleScreen(
             state = state,
             onPrevWeek = viewModel::previousWeek,
             onNextWeek = viewModel::nextWeek,
@@ -481,29 +549,66 @@ private fun AppContent(
             onSearchCourses = onSearchCourses,
             onSearchResultClick = onSearchResultClick,
         )
-
-        AppDestination.Today -> TodayScreen(state = state)
-
-        AppDestination.Settings -> SettingsScreen(
-            state = state,
-            dynamicColor = dynamicColor,
-            onDynamicColorChange = onDynamicColorChange,
-            customColorArgb = customColorArgb,
-            onCustomColorPicked = onCustomColorPicked,
-            onUpdateTerm = viewModel::updateTerm,
-            onUpdateTimeSlots = viewModel::updateTimeSlots,
-            onSelectTimetable = viewModel::selectTimetable,
-            onCreateTimetable = viewModel::createTimetable,
-            onDeleteTimetable = viewModel::deleteTimetable,
-            onRenameTimetable = viewModel::renameTimetable,
-            onExportTimetable = viewModel::exportTimetableJson,
-            onExportIcs = viewModel::exportTimetableIcs,
-            onExportCsv = viewModel::exportTimetableCsv,
-            onImportTimetable = viewModel::importTimetableText,
-            message = message,
-            onConsumeMessage = onConsumeMessage,
-        )
     }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 课表始终垫在最下层，今日/设置通过预测式返回滑开时可以真实露出课表。
+        Box(
+            modifier = if (destination == AppDestination.Schedule) {
+                Modifier.fillMaxSize()
+            } else {
+                Modifier.fillMaxSize().clearAndSetSemantics {}
+            },
+        ) {
+            scheduleContent()
+        }
+
+        AnimatedContent(
+            targetState = destination,
+            transitionSpec = {
+                fadeIn(tween(180)) togetherWith fadeOut(tween(120))
+            },
+            label = "destination",
+        ) { dest ->
+            if (dest != AppDestination.Schedule) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationX = backProgress * size.width * 0.25f
+                            alpha = 1f - backProgress * 0.15f
+                        },
+                ) {
+                    when (dest) {
+                        AppDestination.Today -> TodayScreen(state = state)
+                        AppDestination.Settings -> SettingsScreen(
+                            state = state,
+                            dynamicColor = dynamicColor,
+                            onDynamicColorChange = onDynamicColorChange,
+                            customColorArgb = customColorArgb,
+                            onCustomColorPicked = onCustomColorPicked,
+                            hideStatusBar = hideStatusBar,
+                            onHideStatusBarChange = onHideStatusBarChange,
+                            onUpdateTerm = viewModel::updateTerm,
+                            onUpdateTimeSlots = viewModel::updateTimeSlots,
+                            onSelectTimetable = viewModel::selectTimetable,
+                            onCreateTimetable = viewModel::createTimetable,
+                            onDeleteTimetable = viewModel::deleteTimetable,
+                            onRenameTimetable = viewModel::renameTimetable,
+                            onExportTimetable = viewModel::exportTimetableJson,
+                            onExportIcs = viewModel::exportTimetableIcs,
+                            onExportCsv = viewModel::exportTimetableCsv,
+                            onImportTimetable = viewModel::importTimetableText,
+                            message = message,
+                            onConsumeMessage = onConsumeMessage,
+                        )
+                        AppDestination.Schedule -> Unit
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {

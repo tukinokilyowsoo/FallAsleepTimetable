@@ -1,6 +1,17 @@
 package io.github.fallasleeptimetable.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -83,7 +94,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -136,9 +150,23 @@ fun ScheduleScreen(
     val term = state.term
     var detailSession by remember { mutableStateOf<VisibleSession?>(null) }
     var showSearch by remember { mutableStateOf(false) }
-
-    val weekSessions = remember(state.courses, state.currentWeek) {
-        visibleSessions(state.courses, state.currentWeek)
+    val fullscreenZoom = remember(fullscreen) {
+        Animatable(if (fullscreen) 0.94f else 1f)
+    }
+    LaunchedEffect(fullscreenZoom) {
+        fullscreenZoom.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(280, easing = FastOutSlowInEasing),
+        )
+    }
+    val haptics = LocalHapticFeedback.current
+    val prevWeekWithHaptic = {
+        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onPrevWeek()
+    }
+    val nextWeekWithHaptic = {
+        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onNextWeek()
     }
 
     Scaffold(
@@ -185,7 +213,14 @@ fun ScheduleScreen(
                 }
 
                 else -> {
-                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = fullscreenZoom.value
+                                scaleY = fullscreenZoom.value
+                            },
+                    ) {
                         val expanded = maxWidth >= 840.dp
                         if (expanded && !fullscreen) {
                             Row(
@@ -194,13 +229,78 @@ fun ScheduleScreen(
                                     .padding(vertical = 8.dp),
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                             ) {
+                                AnimatedContent(
+                                    targetState = state.currentWeek,
+                                    modifier = Modifier.weight(2f).fillMaxHeight(),
+                                    transitionSpec = { slideWeekBoard() },
+                                    label = "weekBoardTransition",
+                                ) { animatedWeek ->
+                                    val animatedState = state.forWeek(animatedWeek)
+                                    val sessions = remember(animatedWeek, state.courses) {
+                                        visibleSessions(state.courses, animatedWeek)
+                                    }
+                                    WeekBoard(
+                                        state = animatedState,
+                                        sessions = sessions,
+                                        onPrevWeek = prevWeekWithHaptic,
+                                        onNextWeek = nextWeekWithHaptic,
+                                        onJumpToCurrentWeek = onJumpToCurrentWeek,
+                                        fullscreen = false,
+                                        onToggleFullscreen = onToggleFullscreen,
+                                        onEmptyClick = { day, period ->
+                                            onEditRequest(
+                                                EditorRequest(
+                                                    dayOfWeek = day,
+                                                    startPeriod = period,
+                                                    periodCount = 2.coerceAtMost(
+                                                        term.periodsPerDay - period + 1,
+                                                    ),
+                                                    startWeek = 1,
+                                                    endWeek = term.totalWeeks,
+                                                    colorIndex = animatedState.courses.size % 6,
+                                                ),
+                                            )
+                                        },
+                                        onSessionClick = { detailSession = it },
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                                AnimatedContent(
+                                    targetState = state.currentWeek,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    transitionSpec = { fadeWeekOverview() },
+                                    label = "weekOverviewTransition",
+                                ) { animatedWeek ->
+                                    val animatedState = state.forWeek(animatedWeek)
+                                    val sessions = remember(animatedWeek, state.courses) {
+                                        visibleSessions(state.courses, animatedWeek)
+                                    }
+                                    WeekOverview(
+                                        state = animatedState,
+                                        sessions = sessions,
+                                        onSessionClick = { detailSession = it },
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                            }
+                        } else {
+                            AnimatedContent(
+                                targetState = state.currentWeek,
+                                modifier = Modifier.fillMaxSize(),
+                                transitionSpec = { slideWholeWeek() },
+                                label = "weekTransition",
+                            ) { animatedWeek ->
+                                val animatedState = state.forWeek(animatedWeek)
+                                val sessions = remember(animatedWeek, state.courses) {
+                                    visibleSessions(state.courses, animatedWeek)
+                                }
                                 WeekBoard(
-                                    state = state,
-                                    sessions = weekSessions,
-                                    onPrevWeek = onPrevWeek,
-                                    onNextWeek = onNextWeek,
+                                    state = animatedState,
+                                    sessions = sessions,
+                                    onPrevWeek = prevWeekWithHaptic,
+                                    onNextWeek = nextWeekWithHaptic,
                                     onJumpToCurrentWeek = onJumpToCurrentWeek,
-                                    fullscreen = false,
+                                    fullscreen = fullscreen,
                                     onToggleFullscreen = onToggleFullscreen,
                                     onEmptyClick = { day, period ->
                                         onEditRequest(
@@ -212,48 +312,16 @@ fun ScheduleScreen(
                                                 ),
                                                 startWeek = 1,
                                                 endWeek = term.totalWeeks,
-                                                colorIndex = state.courses.size % 6,
+                                                colorIndex = animatedState.courses.size % 6,
                                             ),
                                         )
                                     },
                                     onSessionClick = { detailSession = it },
-                                    modifier = Modifier.weight(2f).fillMaxHeight(),
-                                )
-                                WeekOverview(
-                                    state = state,
-                                    sessions = weekSessions,
-                                    onSessionClick = { detailSession = it },
-                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(vertical = 8.dp),
                                 )
                             }
-                        } else {
-                            WeekBoard(
-                                state = state,
-                                sessions = weekSessions,
-                                onPrevWeek = onPrevWeek,
-                                onNextWeek = onNextWeek,
-                                onJumpToCurrentWeek = onJumpToCurrentWeek,
-                                fullscreen = fullscreen,
-                                onToggleFullscreen = onToggleFullscreen,
-                                onEmptyClick = { day, period ->
-                                    onEditRequest(
-                                        EditorRequest(
-                                            dayOfWeek = day,
-                                            startPeriod = period,
-                                            periodCount = 2.coerceAtMost(
-                                                term.periodsPerDay - period + 1,
-                                            ),
-                                            startWeek = 1,
-                                            endWeek = term.totalWeeks,
-                                            colorIndex = state.courses.size % 6,
-                                        ),
-                                    )
-                                },
-                                onSessionClick = { detailSession = it },
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(vertical = 8.dp),
-                            )
                         }
                     }
                 }
@@ -396,6 +464,60 @@ private fun CourseSearchDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("关闭") }
         },
+    )
+}
+
+private fun AnimatedContentTransitionScope<Int>.slideWeekBoard(): ContentTransform {
+    val direction = if (targetState > initialState) 1 else -1
+    val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(
+        durationMillis = 240,
+        easing = FastOutSlowInEasing,
+    )
+    return (
+        slideInHorizontally(slideSpec) { width -> direction * width / 4 } +
+            fadeIn(tween(220))
+        ).togetherWith(
+        slideOutHorizontally(slideSpec) { width -> -direction * width / 4 } +
+            fadeOut(tween(150)),
+    )
+}
+
+private fun AnimatedContentTransitionScope<Int>.fadeWeekOverview(): ContentTransform {
+    val direction = if (targetState > initialState) 1 else -1
+    val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(
+        durationMillis = 200,
+        easing = FastOutSlowInEasing,
+    )
+    return (
+        slideInHorizontally(slideSpec) { width -> direction * width / 10 } +
+            fadeIn(tween(200, delayMillis = 30))
+        ).togetherWith(
+        slideOutHorizontally(slideSpec) { width -> -direction * width / 10 } +
+            fadeOut(tween(120)),
+    )
+}
+
+private fun AnimatedContentTransitionScope<Int>.slideWholeWeek(): ContentTransform {
+    val direction = if (targetState > initialState) 1 else -1
+    val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(
+        durationMillis = 220,
+        easing = FastOutSlowInEasing,
+    )
+    return (
+        slideInHorizontally(slideSpec) { width -> direction * width / 5 } +
+            fadeIn(tween(220))
+        ).togetherWith(
+        slideOutHorizontally(slideSpec) { width -> -direction * width / 5 } +
+            fadeOut(tween(160)),
+    )
+}
+
+private fun ScheduleUiState.forWeek(week: Int): ScheduleUiState {
+    val start = term?.let { LocalDate.ofEpochDay(it.startDateEpochDay) } ?: return this
+    return copy(
+        currentWeek = week,
+        isCurrentWeek = week == actualWeek,
+        weekStart = start.plusWeeks((week - 1).toLong()),
     )
 }
 

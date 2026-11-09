@@ -2,7 +2,7 @@
 
 一个 Material You（Material 3）风格的 Android 课程表应用：离线、无账号、无后端，手机与平板自适应。
 
-> 当前状态：**v0.5.7-beta 测试版** —— M0–M3 已完成；新增适配 Niagara 自由缩放的透明今日课程组件。剩余功能见 [剩余功能执行计划](docs/剩余功能执行计划.md)。
+> 当前状态：**v0.5.8-beta 测试版** —— M0–M3 已完成；新增周切换、预测式返回、全屏放大与 FAB 旋转动效，以及「隐藏状态栏」开关；Niagara 小组件已移除。剩余功能见 [剩余功能执行计划](docs/剩余功能执行计划.md)。
 
 ## 技术栈
 
@@ -23,6 +23,7 @@
 
 详细环境与验证记录见 [docs/M0-记录.md](docs/M0-记录.md)、[docs/M1-记录.md](docs/M1-记录.md)、[docs/M2-记录.md](docs/M2-记录.md) 与 [docs/M3-记录.md](docs/M3-记录.md)。
 
+- [v0.5.8-beta 更新说明](docs/RELEASE-NOTES-v0.5.8-beta.md)
 - [v0.5.7-beta 更新说明](docs/RELEASE-NOTES-v0.5.7-beta.md)
 - [v0.5.6-beta 更新说明](docs/RELEASE-NOTES-v0.5.6-beta.md)
 - [v0.5.5-beta 更新说明](docs/RELEASE-NOTES-v0.5.5-beta.md)
@@ -39,7 +40,7 @@
 
 ## 下载 / 测试版
 
-测试版发布在仓库的 **Releases** 页面：`v0.5.7-beta`（`FallAsleepTimetable_arm64_v0.5.7-beta.apk`，arm64-v8a，约 11 MB）。
+测试版发布在仓库的 **Releases** 页面：`v0.5.8-beta`（`FallAsleepTimetable_arm64_v0.5.8-beta.apk`，arm64-v8a，约 11 MB）。
 
 > 包名：`io.github.tukinokilyowsoo.fallasleeptimetable`。从 beta2 起更换了包名，可与更早版本并存；数据不互通，需要导出 JSON 再导入。
 

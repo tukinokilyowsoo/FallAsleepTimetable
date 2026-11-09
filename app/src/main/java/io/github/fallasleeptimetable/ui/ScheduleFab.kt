@@ -1,6 +1,9 @@
 package io.github.fallasleeptimetable.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Search
@@ -22,8 +24,10 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -90,10 +94,16 @@ fun ScheduleFab(
             }
         }
 
+        val iconRotation by animateFloatAsState(
+            targetValue = if (expanded) 45f else 0f,
+            animationSpec = tween(220, easing = FastOutSlowInEasing),
+            label = "fabIconRotation",
+        )
         FloatingActionButton(onClick = onToggle) {
             Icon(
-                imageVector = if (expanded) Icons.Filled.Close else Icons.Filled.Add,
+                imageVector = Icons.Filled.Add,
                 contentDescription = if (expanded) "收起操作" else "更多操作",
+                modifier = Modifier.rotate(iconRotation),
             )
         }
     }

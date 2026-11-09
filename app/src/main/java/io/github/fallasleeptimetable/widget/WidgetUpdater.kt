@@ -42,7 +42,6 @@ object WidgetUpdater {
     private suspend fun updateAllNow(context: Context) {
         runCatching { TodayCoursesWidget().updateAll(context) }
         runCatching { WeekScheduleWidget().updateAll(context) }
-        runCatching { NiagaraTodayWidget().updateAll(context) }
         runCatching { WidgetRefreshScheduler.scheduleNext(context) }
     }
 }

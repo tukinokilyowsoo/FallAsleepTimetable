@@ -47,12 +47,11 @@ object WidgetRefreshScheduler {
         val manager = GlanceAppWidgetManager(appContext)
 
         val todayIds = glanceIds(manager, TodayCoursesWidget::class.java)
-        val niagaraIds = glanceIds(manager, NiagaraTodayWidget::class.java)
         val weekIds = runCatching {
             manager.getGlanceIds(WeekScheduleWidget::class.java)
         }.getOrDefault(emptyList())
 
-        if (todayIds.isEmpty() && niagaraIds.isEmpty() && weekIds.isEmpty()) {
+        if (todayIds.isEmpty() && weekIds.isEmpty()) {
             cancelAlarm(appContext)
             return
         }
@@ -61,9 +60,9 @@ object WidgetRefreshScheduler {
         val today = now.toLocalDate()
 
         // 只有周课表组件时，内容只在跨天时变化。
-        val needsClassEndRefresh = todayIds.isNotEmpty() || niagaraIds.isNotEmpty()
+        val needsClassEndRefresh = todayIds.isNotEmpty()
         val endMinutes = if (needsClassEndRefresh) {
-            (todayIds + niagaraIds).flatMap { appWidgetId ->
+            todayIds.flatMap { appWidgetId ->
                 val data = runCatching {
                     WidgetDataLoader.load(appContext, appWidgetId)
                 }.getOrNull() ?: return@flatMap emptyList()
