@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -72,10 +74,6 @@ import io.github.fallasleeptimetable.R
 import io.github.fallasleeptimetable.data.TermEntity
 import io.github.fallasleeptimetable.data.calendar.CalendarScheduleExporter
 import io.github.fallasleeptimetable.data.diagnostics.ImportLog
-import io.github.fallasleeptimetable.data.importer.ImportSettingsSummary
-import io.github.fallasleeptimetable.data.importer.TimetableImporter
-import io.github.fallasleeptimetable.data.share.ScheduleImageExporter
-import io.github.fallasleeptimetable.data.share.ShareLauncher
 import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.ui.ScheduleUiState
 import io.github.fallasleeptimetable.widget.WidgetRefreshScheduler
@@ -99,16 +97,14 @@ fun SettingsScreen(
     onCustomColorPicked: (Long) -> Unit,
     hideStatusBar: Boolean,
     onHideStatusBarChange: (Boolean) -> Unit,
+    onShowWelcome: () -> Unit,
     onUpdateTerm: (TermEntity) -> Unit,
     onUpdateTimeSlots: (Int, List<Pair<Int, Int>>) -> Unit,
     onSelectTimetable: (Long) -> Unit,
     onCreateTimetable: (String) -> Unit,
     onDeleteTimetable: (Long) -> Unit,
     onRenameTimetable: (Long, String) -> Unit,
-    onExportTimetable: () -> String?,
     onExportIcs: () -> String?,
-    onExportCsv: () -> String?,
-    onImportTimetable: (String, Boolean) -> Unit,
     message: String?,
     onConsumeMessage: () -> Unit,
 ) {
@@ -125,14 +121,11 @@ fun SettingsScreen(
     var pendingCalendarAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var deleteCurrentCalendarConfirm by remember { mutableStateOf(false) }
     var deleteAllCalendarConfirm by remember { mutableStateOf(false) }
-    var showShareImage by remember { mutableStateOf(false) }
-    var shareBusy by remember { mutableStateOf(false) }
-    var pendingImport by remember {
-        mutableStateOf<Pair<String, ImportSettingsSummary>?>(null)
-    }
     var showLicenseDialog by remember { mutableStateOf(false) }
     var showThirdPartyNotices by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
+    var showContactDeveloper by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var widgetTheme by remember { mutableStateOf(WidgetThemeSetting.get(context)) }
@@ -280,17 +273,9 @@ fun SettingsScreen(
         )
     }
 
-    val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json"),
-    ) { uri -> saveText(uri, onExportTimetable(), "课表已导出为 JSON") }
-
     val exportIcsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/calendar"),
     ) { uri -> saveText(uri, onExportIcs(), "课表已导出为 ICS") }
-
-    val exportCsvLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/csv"),
-    ) { uri -> saveText(uri, onExportCsv(), "课表已导出为 CSV") }
 
     val logLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain"),
@@ -314,28 +299,6 @@ fun SettingsScreen(
                 onSuccess = { "日志已导出" },
                 onFailure = { "导出失败：${it.message ?: "未知错误"}" },
             )
-        }
-    }
-
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri != null) {
-            val text = runCatching {
-                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                    ?: error("无法读取文件")
-            }.getOrElse { error ->
-                localMessage = "读取失败：${error.message ?: "未知错误"}"
-                null
-            }
-            if (text != null) {
-                val summary = TimetableImporter.inspect(text)
-                if (summary != null) {
-                    pendingImport = text to summary
-                } else {
-                    onImportTimetable(text, false)
-                }
-            }
         }
     }
 
@@ -599,18 +562,8 @@ fun SettingsScreen(
             item { SectionHeader("数据") }
             item {
                 ListItem(
-                    headlineContent = { Text("导出 JSON 备份") },
-                    supportingContent = { Text("完整备份，可在本应用恢复") },
-                    leadingContent = { Icon(Icons.Filled.Share, contentDescription = null) },
-                    modifier = Modifier.clickable {
-                        exportLauncher.launch("FallAsleep课表.json")
-                    },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("导出 ICS 日历") },
-                    supportingContent = { Text("可导入系统日历、Google 日历等") },
+                    headlineContent = { Text("导出日历") },
+                    supportingContent = { Text("保存为 .ics，可导入系统日历、Google 日历等") },
                     leadingContent = { Icon(Icons.Filled.DateRange, contentDescription = null) },
                     modifier = Modifier.clickable {
                         exportIcsLauncher.launch("FallAsleep课表.ics")
@@ -619,47 +572,7 @@ fun SettingsScreen(
             }
             item {
                 ListItem(
-                    headlineContent = { Text("导出 CSV 表格") },
-                    supportingContent = { Text("可导入 Excel 或其他课程表工具") },
-                    leadingContent = { Icon(Icons.Filled.Share, contentDescription = null) },
-                    modifier = Modifier.clickable {
-                        exportCsvLauncher.launch("FallAsleep课表.csv")
-                    },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("分享课表长图") },
-                    supportingContent = {
-                        Text(
-                            if (shareBusy) {
-                                "正在生成图片…"
-                            } else {
-                                "生成本周或整学期 PNG，可保存或发送"
-                            },
-                        )
-                    },
-                    leadingContent = { Icon(Icons.Filled.Share, contentDescription = null) },
-                    modifier = Modifier.clickable(enabled = !shareBusy) {
-                        showShareImage = true
-                    },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("导入课表") },
-                    supportingContent = {
-                        Text("支持 JSON / ICS / CSV / 旧版 .wakeup_schedule")
-                    },
-                    leadingContent = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    modifier = Modifier.clickable {
-                        importLauncher.launch(arrayOf("*/*"))
-                    },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("导入到系统日历") },
+                    headlineContent = { Text("导入到日历") },
                     supportingContent = {
                         Text(
                             if (calendarBusy) {
@@ -724,6 +637,41 @@ fun SettingsScreen(
             item { HorizontalDivider() }
 
             item { SectionHeader("关于") }
+            item {
+                ListItem(
+                    headlineContent = { Text("检查更新") },
+                    supportingContent = {
+                        Text("当前版本 ${BuildConfig.VERSION_NAME} · 支持 GitHub / 国内镜像")
+                    },
+                    leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
+                    modifier = Modifier.clickable { showUpdateDialog = true },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("联系开发者") },
+                    supportingContent = { Text("点此提交问题反馈") },
+                    leadingContent = {
+                        Image(
+                            painter = painterResource(R.drawable.profile_avatar),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                        )
+                    },
+                    modifier = Modifier.clickable { showContactDeveloper = true },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("我还想看一遍欢迎页🥺") },
+                    supportingContent = { Text("重新浏览四页功能介绍") },
+                    leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
+                    modifier = Modifier.clickable { onShowWelcome() },
+                )
+            }
             item {
                 ListItem(
                     headlineContent = { Text("FallAsleep 课程表") },
@@ -917,103 +865,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showShareImage) {
-        ShareImageDialog(
-            onDismiss = { showShareImage = false },
-            onShare = { options ->
-                showShareImage = false
-                val term = state.term
-                val table = state.selectedTimetable
-                if (term == null || table == null) {
-                    localMessage = "还没有可分享的课表"
-                } else {
-                    val courses = state.courses
-                    val slots = state.timeSlots
-                    val week = state.currentWeek
-                    shareBusy = true
-                    scope.launch {
-                        val outcome = withContext(Dispatchers.Default) {
-                            runCatching {
-                                ScheduleImageExporter.renderPng(
-                                    term = term,
-                                    timetableName = table.name,
-                                    courses = courses,
-                                    timeSlots = slots,
-                                    currentWeek = week,
-                                    options = options,
-                                )
-                            }
-                        }
-                        shareBusy = false
-                        outcome.fold(
-                            onSuccess = { png ->
-                                if (png == null) {
-                                    localMessage = "当前课表还没有课程"
-                                } else {
-                                    runCatching {
-                                        ShareLauncher.sharePng(
-                                            context,
-                                            png,
-                                            "FallAsleep课表.png",
-                                        )
-                                    }.onFailure {
-                                        localMessage = "分享失败：${it.message ?: "未知错误"}"
-                                    }
-                                }
-                            },
-                            onFailure = {
-                                localMessage = "生成图片失败：${it.message ?: "未知错误"}"
-                            },
-                        )
-                    }
-                }
-            },
-        )
-    }
-
-    pendingImport?.let { (text, summary) ->
-        val details = buildList {
-            summary.startDateEpochDay?.let {
-                add("开学日期 ${LocalDate.ofEpochDay(it).format(settingsDateFormat)}")
-            }
-            summary.totalWeeks?.let { add("总周数 $it 周") }
-            summary.periodsPerDay?.let { add("每天 $it 节") }
-            if (summary.timeSlotCount > 0) {
-                add("节次时间 ${summary.timeSlotCount} 条")
-            }
-        }
-        AlertDialog(
-            onDismissRequest = { pendingImport = null },
-            title = { Text("一并恢复学期设置？") },
-            text = {
-                Text(
-                    "这份 JSON 还包含：\n" + details.joinToString("\n") +
-                        "\n\n恢复会覆盖当前学期（以及该学期下所有课表）共用的" +
-                        "开学日期、周数和上课时间。",
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        pendingImport = null
-                        onImportTimetable(text, true)
-                    },
-                ) { Text("一并恢复") }
-            },
-            dismissButton = {
-                Row {
-                    TextButton(onClick = { pendingImport = null }) { Text("取消") }
-                    TextButton(
-                        onClick = {
-                            pendingImport = null
-                            onImportTimetable(text, false)
-                        },
-                    ) { Text("仅导入课程") }
-                }
-            },
-        )
-    }
-
     if (showLicenseDialog) {
         LicenseDialog(
             context = context,
@@ -1032,6 +883,19 @@ fun SettingsScreen(
         PrivacyPolicyDialog(
             context = context,
             onDismiss = { showPrivacyPolicy = false },
+        )
+    }
+
+    if (showContactDeveloper) {
+        ContactDeveloperDialog(
+            onDismiss = { showContactDeveloper = false },
+        )
+    }
+
+    if (showUpdateDialog) {
+        UpdateDialog(
+            currentVersion = BuildConfig.VERSION_NAME,
+            onDismiss = { showUpdateDialog = false },
         )
     }
 

@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -56,7 +55,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -110,7 +109,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.fallasleeptimetable.R
-import io.github.fallasleeptimetable.data.CourseSearchRow
 import io.github.fallasleeptimetable.data.TermEntity
 import io.github.fallasleeptimetable.domain.CourseDraft
 import io.github.fallasleeptimetable.domain.VisibleSession
@@ -142,14 +140,10 @@ fun ScheduleScreen(
     onDeleteCourse: (Long) -> Unit,
     onEditRequest: (EditorRequest) -> Unit,
     onCreateTimetableRequest: () -> Unit,
-    searchQuery: String,
-    searchResults: List<CourseSearchRow>,
-    onSearchCourses: (String) -> Unit,
-    onSearchResultClick: (CourseSearchRow) -> Unit,
+    onShareClick: () -> Unit,
 ) {
     val term = state.term
     var detailSession by remember { mutableStateOf<VisibleSession?>(null) }
-    var showSearch by remember { mutableStateOf(false) }
     val fullscreenZoom = remember(fullscreen) {
         Animatable(if (fullscreen) 0.94f else 1f)
     }
@@ -175,10 +169,10 @@ fun ScheduleScreen(
                 TopAppBar(
                     title = { Text(state.selectedTimetable?.name ?: "课表") },
                     actions = {
-                        IconButton(onClick = { showSearch = true }) {
+                        IconButton(onClick = onShareClick) {
                             Icon(
-                                Icons.Filled.Search,
-                                contentDescription = "搜索课程",
+                                Icons.Filled.Share,
+                                contentDescription = "分享与导出",
                             )
                         }
                     },
@@ -358,113 +352,6 @@ fun ScheduleScreen(
             onDismiss = { detailSession = null },
         )
     }
-
-    if (showSearch) {
-        CourseSearchDialog(
-            query = searchQuery,
-            results = searchResults,
-            onQueryChange = onSearchCourses,
-            onResultClick = { row ->
-                onSearchResultClick(row)
-                showSearch = false
-            },
-            onDismiss = {
-                showSearch = false
-                onSearchCourses("")
-            },
-        )
-    }
-}
-
-@Composable
-private fun CourseSearchDialog(
-    query: String,
-    results: List<CourseSearchRow>,
-    onQueryChange: (String) -> Unit,
-    onResultClick: (CourseSearchRow) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("搜索课程") },
-        text = {
-            Column(modifier = Modifier.heightIn(max = 460.dp)) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("课程名、教师或教室") },
-                    leadingIcon = {
-                        Icon(Icons.Filled.Search, contentDescription = null)
-                    },
-                    singleLine = true,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                when {
-                    query.isBlank() -> Text(
-                        text = "输入关键词后显示结果，点击结果跳转到对应课表与周次。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    results.isEmpty() -> Text(
-                        text = "没有匹配的课程",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    else -> LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        items(results) { row ->
-                            val colors = courseColors(row.colorIndex)
-                            ListItem(
-                                headlineContent = { Text(row.courseName) },
-                                overlineContent = { Text(row.timetableName) },
-                                supportingContent = {
-                                    Text(
-                                        buildString {
-                                            append(dayLabel(row.dayOfWeek)).append(' ')
-                                            append(
-                                                periodLabel(
-                                                    row.startPeriod,
-                                                    row.periodCount,
-                                                ),
-                                            )
-                                            append(" · ")
-                                            append(
-                                                weekRangeLabel(
-                                                    row.startWeek,
-                                                    row.endWeek,
-                                                    row.parity,
-                                                ),
-                                            )
-                                            row.teacher?.takeIf { it.isNotBlank() }?.let {
-                                                append(" · ").append(it)
-                                            }
-                                            row.room?.takeIf { it.isNotBlank() }?.let {
-                                                append(" · ").append(it)
-                                            }
-                                        },
-                                    )
-                                },
-                                leadingContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(10.dp)
-                                            .clip(CircleShape)
-                                            .background(colors.container),
-                                    )
-                                },
-                                modifier = Modifier.clickable { onResultClick(row) },
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
-        },
-    )
 }
 
 private fun AnimatedContentTransitionScope<Int>.slideWeekBoard(): ContentTransform {

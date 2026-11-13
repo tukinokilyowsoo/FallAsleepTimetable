@@ -66,13 +66,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.fallasleeptimetable.R
-import io.github.fallasleeptimetable.data.CourseSearchRow
 import io.github.fallasleeptimetable.ui.screens.CourseEditorDialog
 import io.github.fallasleeptimetable.ui.screens.CreateTimetableDialog
 import io.github.fallasleeptimetable.ui.screens.EduImportActivity
 import io.github.fallasleeptimetable.ui.screens.EditorRequest
 import io.github.fallasleeptimetable.ui.screens.ScheduleScreen
 import io.github.fallasleeptimetable.ui.screens.SettingsScreen
+import io.github.fallasleeptimetable.ui.screens.ShareExportSheet
 import io.github.fallasleeptimetable.ui.screens.TimetablePickerDialog
 import io.github.fallasleeptimetable.ui.screens.TodayScreen
 import kotlinx.coroutines.delay
@@ -94,12 +94,11 @@ fun FallAsleepApp(
     onCustomColorPicked: (Long) -> Unit,
     hideStatusBar: Boolean,
     onHideStatusBarChange: (Boolean) -> Unit,
+    onShowWelcome: () -> Unit,
 ) {
     val scheduleViewModel: ScheduleViewModel = viewModel()
     val state by scheduleViewModel.uiState.collectAsStateWithLifecycle()
     val message by scheduleViewModel.message.collectAsStateWithLifecycle()
-    val searchQuery by scheduleViewModel.searchQuery.collectAsStateWithLifecycle()
-    val searchResults by scheduleViewModel.searchResults.collectAsStateWithLifecycle()
 
     var destination by rememberSaveable { mutableStateOf(AppDestination.Schedule) }
     var fabExpanded by remember { mutableStateOf(false) }
@@ -111,6 +110,8 @@ fun FallAsleepApp(
     var renameTarget by remember { mutableStateOf<Pair<Long, String>?>(null) }
     var fullscreen by rememberSaveable { mutableStateOf(false) }
     var backProgress by remember { mutableFloatStateOf(0f) }
+    var showShareSheet by remember { mutableStateOf(false) }
+    var shareMessage by remember { mutableStateOf<String?>(null) }
 
     // 预测式返回：全屏时退出全屏；在「今日/设置」时回到「课表」。
     // 手势过程中按进度位移、淡出当前页面，取消则自动回弹。
@@ -230,10 +231,8 @@ fun FallAsleepApp(
                         onConsumeMessage = scheduleViewModel::consumeMessage,
                         hideStatusBar = hideStatusBar,
                         onHideStatusBarChange = onHideStatusBarChange,
-                        searchQuery = searchQuery,
-                        searchResults = searchResults,
-                        onSearchCourses = scheduleViewModel::searchCourses,
-                        onSearchResultClick = scheduleViewModel::jumpToSearchResult,
+                        onShowWelcome = onShowWelcome,
+                        onShareClick = { showShareSheet = true },
                         backProgress = backProgress,
                     )
                 }
@@ -294,10 +293,8 @@ fun FallAsleepApp(
                         onConsumeMessage = scheduleViewModel::consumeMessage,
                         hideStatusBar = hideStatusBar,
                         onHideStatusBarChange = onHideStatusBarChange,
-                        searchQuery = searchQuery,
-                        searchResults = searchResults,
-                        onSearchCourses = scheduleViewModel::searchCourses,
-                        onSearchResultClick = scheduleViewModel::jumpToSearchResult,
+                        onShowWelcome = onShowWelcome,
+                        onShareClick = { showShareSheet = true },
                         backProgress = backProgress,
                     )
                 }
@@ -508,6 +505,26 @@ fun FallAsleepApp(
             },
         )
     }
+
+    if (showShareSheet) {
+        ShareExportSheet(
+            state = state,
+            viewModel = scheduleViewModel,
+            onDismiss = { showShareSheet = false },
+            onMessage = { shareMessage = it },
+        )
+    }
+
+    shareMessage?.let { text ->
+        AlertDialog(
+            onDismissRequest = { shareMessage = null },
+            title = { Text("提示") },
+            text = { Text(text) },
+            confirmButton = {
+                TextButton(onClick = { shareMessage = null }) { Text("好") }
+            },
+        )
+    }
 }
 
 @Composable
@@ -527,10 +544,8 @@ private fun AppContent(
     onConsumeMessage: () -> Unit,
     hideStatusBar: Boolean,
     onHideStatusBarChange: (Boolean) -> Unit,
-    searchQuery: String,
-    searchResults: List<CourseSearchRow>,
-    onSearchCourses: (String) -> Unit,
-    onSearchResultClick: (CourseSearchRow) -> Unit,
+    onShowWelcome: () -> Unit,
+    onShareClick: () -> Unit,
     backProgress: Float,
 ) {
     val scheduleContent: @Composable () -> Unit = {
@@ -544,10 +559,7 @@ private fun AppContent(
             onDeleteCourse = viewModel::deleteCourse,
             onEditRequest = onEditRequest,
             onCreateTimetableRequest = onCreateTimetableRequest,
-            searchQuery = searchQuery,
-            searchResults = searchResults,
-            onSearchCourses = onSearchCourses,
-            onSearchResultClick = onSearchResultClick,
+            onShareClick = onShareClick,
         )
     }
 
@@ -589,16 +601,14 @@ private fun AppContent(
                             onCustomColorPicked = onCustomColorPicked,
                             hideStatusBar = hideStatusBar,
                             onHideStatusBarChange = onHideStatusBarChange,
+                            onShowWelcome = onShowWelcome,
                             onUpdateTerm = viewModel::updateTerm,
                             onUpdateTimeSlots = viewModel::updateTimeSlots,
                             onSelectTimetable = viewModel::selectTimetable,
                             onCreateTimetable = viewModel::createTimetable,
                             onDeleteTimetable = viewModel::deleteTimetable,
                             onRenameTimetable = viewModel::renameTimetable,
-                            onExportTimetable = viewModel::exportTimetableJson,
                             onExportIcs = viewModel::exportTimetableIcs,
-                            onExportCsv = viewModel::exportTimetableCsv,
-                            onImportTimetable = viewModel::importTimetableText,
                             message = message,
                             onConsumeMessage = onConsumeMessage,
                         )

@@ -179,10 +179,22 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         return CsvExporter.build(state.courses)
     }
 
-    fun importTimetableText(text: String, applySettings: Boolean = false) {
+    fun importTimetableText(
+        text: String,
+        applySettings: Boolean = false,
+        onResult: ((String) -> Unit)? = null,
+    ) {
+        fun report(message: String) {
+            if (onResult != null) {
+                onResult(message)
+            } else {
+                _message.value = message
+            }
+        }
+
         val term = uiState.value.term
         if (term == null) {
-            _message.value = "还没有学期，无法导入"
+            report("还没有学期，无法导入")
             return
         }
         viewModelScope.launch {
@@ -190,14 +202,16 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                 .onSuccess { result ->
                     selectTimetable(result.timetableId)
                     weekOverride.value = null
-                    _message.value = buildString {
-                        append("已导入 ").append(result.courseCount).append(" 门课程")
-                        if (applySettings) append("，并恢复学期设置与节次时间")
-                    }
+                    report(
+                        buildString {
+                            append("已导入 ").append(result.courseCount).append(" 门课程")
+                            if (applySettings) append("，并恢复学期设置与节次时间")
+                        },
+                    )
                     WidgetUpdater.updateAll(appContext)
                 }
                 .onFailure { error ->
-                    _message.value = "导入失败：${error.message ?: "文件格式不支持"}"
+                    report("导入失败：${error.message ?: "文件格式不支持"}")
                 }
         }
     }

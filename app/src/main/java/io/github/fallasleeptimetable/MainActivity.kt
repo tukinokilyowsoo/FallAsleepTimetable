@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import io.github.fallasleeptimetable.ui.FallAsleepApp
+import io.github.fallasleeptimetable.ui.screens.WelcomeScreen
 import io.github.fallasleeptimetable.ui.theme.FallAsleepTheme
 import io.github.fallasleeptimetable.widget.WidgetUpdater
 
@@ -42,11 +43,22 @@ class MainActivity : ComponentActivity() {
             var hideStatusBar by rememberSaveable {
                 mutableStateOf(prefs.getBoolean("hide_status_bar", false))
             }
+            var showWelcome by rememberSaveable {
+                mutableStateOf(!prefs.getBoolean("welcome_seen", false))
+            }
 
             FallAsleepTheme(
                 dynamicColor = dynamicColor,
                 customSeed = customColorArgb.takeIf { it != 0L }?.let { Color(it) },
             ) {
+                if (showWelcome) {
+                    WelcomeScreen(
+                        onFinish = {
+                            prefs.edit().putBoolean("welcome_seen", true).apply()
+                            showWelcome = false
+                        },
+                    )
+                } else {
                 FallAsleepApp(
                     dynamicColor = dynamicColor,
                     onDynamicColorChange = { enabled ->
@@ -67,7 +79,12 @@ class MainActivity : ComponentActivity() {
                         hideStatusBar = enabled
                         prefs.edit().putBoolean("hide_status_bar", enabled).apply()
                     },
+                    onShowWelcome = {
+                        prefs.edit().putBoolean("welcome_seen", false).apply()
+                        showWelcome = true
+                    },
                 )
+                }
             }
         }
     }
