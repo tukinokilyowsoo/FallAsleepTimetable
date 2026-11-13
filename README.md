@@ -1,71 +1,142 @@
-# FallAsleep课程表
+# FallAsleep 课程表
 
-一个 Material You（Material 3）风格的 Android 课程表应用：离线、无账号、无后端，手机与平板自适应。
+离线、无广告、完全免费的 Material You 课程表。打开就能看到本周课表，导入一次，管一学期。
 
-> 当前状态：**v1.0.0 正式版** —— 离线、无广告、完全免费的 Material 3 课程表；支持正方（新 / 旧）与强智教务导入、系统日历、桌面小组件、分享长图、检查更新与预测式返回。
+> 当前版本：**v1.0.0 正式版** · Android 8.0+ · arm64-v8a
+
+## 为什么用它
+
+- **无广告，完全免费**：没有广告位、订阅和账号，也没有自建后端。
+- **离线可用**：课表、设置、备份全部保存在本机。
+- **Material 3 / Material You**：Android 12+ 跟随壁纸取色，也支持固定主题色与深色模式。
+- **手机与平板自适应**：手机底部导航，平板侧栏 + 双栏课表与今日课程。
+- **原生 Kotlin**：Jetpack Compose 构建，轻量、干净，不依赖 WebView 外壳。
+
+## 功能
+
+### 课表
+
+- 多课表：主课表、实验课、考研课表分开管理，随时切换。
+- 周次：当前周自动定位、上一周 / 下一周、点击「本周」回到当前周。
+- 课程格：起止周、单双周、连节、颜色、教师、教室、备注。
+- 今日页：当天课程时间轴，已结束课程灰显。
+- 全屏课表：隐藏系统栏与界面元素，课表铺满屏幕。
+- 课程详情弹层、空状态引导。
+
+### 导入
+
+- **教务导入**：内置 WebView 手动登录，抓取当前课表页后在本地解析。
+  - 支持新版正方（jwglxt）、老正方、强智三套模板，自动识别。
+- **文件导入**：JSON 备份、ICS 日历、CSV 表格、旧版 `.wakeup_schedule`。
+- JSON 备份包含学期设置时，可选择一并恢复开学日期、周数和上课时间。
+
+### 分享与导出
+
+主页右上角「分享与导出」集中提供：
+
+- 分享课表长图：本周或整学期，支持主题、显示教师 / 教室开关。
+- 导出 JSON 备份、导出 CSV 表格。
+- 导入课表文件。
+
+设置 → 数据：
+
+- 导出日历（.ics）。
+- 导入到日历：写入系统日历，由系统负责提前提醒。
+- 删除当前课表日程 / 删除全部已导入日程。
+- 导出日志（反馈解析问题用）。
+
+### 桌面小组件
+
+- 今日课程：按组件宽度显示今天 / 今天+明天 / 三天。
+- 周课表：固定当前周，重叠课程分栏，今天列加粗。
+- 每个组件可单独选择课表、显示教师 / 教室、显示后续日期。
+- 下课后 1 分钟内刷新（需授予「闹钟和提醒」权限；未授权时按系统周期刷新）。
+- Android 12+ 莫奈取色。
+
+### 动效与系统
+
+- 平板周切换：课表与今日课程分别滑动淡入淡出。
+- 预测式返回：今日 / 设置滑开时露出下层课表。
+- 全屏放大动画、FAB 加号旋转成叉、切周轻触感。
+- 首次启动欢迎页（可在设置 → 关于中重新查看）。
+- 可隐藏顶部状态栏，保留底部手势条。
+
+### 其他
+
+- 检查更新：默认 GitHub 源，提供国内镜像（gh-proxy 加速 API 与 APK 下载）。
+- 深色模式、自定义主题色、字体缩放、TalkBack 课程描述。
+- 应用内许可证、第三方依赖声明与隐私政策。
+
+## 下载与安装
+
+正式版发布于 [Releases](https://github.com/tukinokilyowsoo/FallAsleepTimetable/releases/latest)：
+
+- 文件：`FallAsleepTimetable_arm64_v1.0.0.apk`
+- 架构：arm64-v8a（绝大多数近年的手机与平板）
+- 大小：约 11 MB
+- SHA-256：`09a0c4a300bb8fa45166ba6a4266ec536f647dc7c97e3fdcf062164ad6b566bd`
+
+安装步骤：
+
+1. 下载 APK；
+2. 允许浏览器 / 文件管理器「安装未知应用」；
+3. 覆盖安装即可保留数据。
+
+说明：
+
+- 使用独立 release 签名。此前安装过 **debug** 版的用户需要先导出 JSON 再卸载重装；安装过 release 版旧测试版的用户可直接覆盖升级。
+- 包名：`io.github.tukinokilyowsoo.fallasleeptimetable`。从 beta2 起更换了包名，可与更早版本并存；数据不互通，需要导出 JSON 再导入。
+
+## 系统要求
+
+- Android 8.0（API 26）及以上
+- arm64-v8a
+- 无网络也可使用课表与小组件；教务导入需要网络
+
+## 已知问题
+
+- 教务页面改版可能导致解析失效；可通过「导出日志」反馈页面 HTML 片段。
+- 解析模板目前覆盖正方（新 / 旧）与强智，其他教务系统暂不支持。
+- ICS 导出使用设备本地浮动时间，跨时区查看时按查看端当地时间显示。
+- 小组件的下课精准刷新依赖「闹钟和提醒」权限；未授权时最长约 30 分钟刷新一次。
+- 预测式返回的完整手势动画需要 Android 13+，旧系统功能一致但没有预览动画。
+
+## 隐私
+
+- 无账号、无后端、无统计 SDK。
+- 教务登录只在应用内 WebView 会话中进行，不保存学号密码。
+- 详细说明见 [PRIVACY.md](PRIVACY.md)。
 
 ## 技术栈
 
-- Kotlin 2.3 + Jetpack Compose + Material 3
+- Kotlin + Jetpack Compose + Material 3
 - `material3-adaptive-navigation-suite`（NavigationBar / Rail / Drawer 自适应）
+- Room + DataStore 本地存储
+- Glance 桌面小组件
+- jsoup 解析教务页面
 - minSdk 26，targetSdk / compileSdk 36
-- 动态取色（Android 12+）与内置浅色/深色配色回退
+- 动态取色（Android 12+）与内置浅色 / 深色配色回退
 
-## 当前进度
-
-| 阶段 | 内容 | 状态 |
-|---|---|---|
-| M0 | 工程骨架、M3 主题、自适应导航、真机截图 | ✅ |
-| M1 | Room 数据模型、课表网格、课程增删改、多课表、学期设置、导入导出 | ✅ |
-| M2 | 教务导入（正方 / 新正方 / 强智 + WebView、重命名、日志） | ✅ 已完成并验证 |
-| M3 | 提醒、小组件、ICS/CSV、分享图 | ✅ 完成（含小组件配置、下课精准刷新、无障碍） |
-| M4 | 多学期、备份、无障碍、打磨 | 计划中 |
-
-详细环境与验证记录见 [docs/M0-记录.md](docs/M0-记录.md)、[docs/M1-记录.md](docs/M1-记录.md)、[docs/M2-记录.md](docs/M2-记录.md) 与 [docs/M3-记录.md](docs/M3-记录.md)。
-
-- [v1.0.0 正式版说明](docs/RELEASE-NOTES-v1.0.0.md)
-- [v0.5.8-beta 更新说明](docs/RELEASE-NOTES-v0.5.8-beta.md)
-- [v0.5.7-beta 更新说明](docs/RELEASE-NOTES-v0.5.7-beta.md)
-- [v0.5.6-beta 更新说明](docs/RELEASE-NOTES-v0.5.6-beta.md)
-- [v0.5.5-beta 更新说明](docs/RELEASE-NOTES-v0.5.5-beta.md)
-- [v0.5.4-beta 更新说明](docs/RELEASE-NOTES-v0.5.4-beta.md)
-- [v0.5.3-beta 更新说明](docs/RELEASE-NOTES-v0.5.3-beta.md)
-- [交接文档](handoff.md)
-- [第三方依赖声明](THIRD-PARTY-NOTICES.md)
-- [隐私政策](PRIVACY.md)
-- [v0.5.2-beta 更新说明](docs/RELEASE-NOTES-v0.5.2-beta.md)
-- [v0.5.1-beta 更新说明](docs/RELEASE-NOTES-v0.5.1-beta.md)
-- [v0.5.0-beta 更新说明](docs/RELEASE-NOTES-v0.5.0-beta.md)
-- [v0.4.0-beta 阶段性交付报告](docs/交付报告-v0.4.0-beta.md)
-- [剩余功能执行计划](docs/剩余功能执行计划.md)
-
-## 下载
-
-正式版发布在仓库的 **Releases** 页面：`v1.0.0`（`FallAsleepTimetable_arm64_v1.0.0.apk`，arm64-v8a，约 11 MB，Android 8.0+）。
-
-> 包名：`io.github.tukinokilyowsoo.fallasleeptimetable`。从 beta2 起更换了包名，可与更早版本并存；数据不互通，需要导出 JSON 再导入。
-
-发布流程与签名备份说明见 [docs/RELEASE-流程.md](docs/RELEASE-流程.md)。
-
-## 目录结构
+## 项目结构
 
 ```
 app/src/main/java/io/github/fallasleeptimetable/
 ├── MainActivity.kt
-└── ui/
-    ├── FallAsleepApp.kt        # 自适应导航壳
-    ├── screens/                # 课表 / 今日 / 设置
-    └── theme/                  # M3 主题与配色
+├── data/            # Room、导入解析、日历、分享、更新检查
+├── domain/          # 课表模型与周次/布局逻辑
+├── ui/              # Compose 导航、课表 / 今日 / 设置、主题
+└── widget/          # Glance 桌面小组件
 ```
 
-## 截图
+## 开发与文档
 
-| 平板（expanded） | 手机（compact） |
-|---|---|
-| ![主页](docs/screenshots/HOME.jpg) | ![](docs/screenshots/schedule-phone.png) |
-| ![小组件](docs/screenshots/WIDGET.jpg) |
-
-更多：课程详情、今日页、设置、学期设置见 `docs/screenshots/`。
+- [M0 记录](docs/M0-记录.md) / [M1 记录](docs/M1-记录.md) / [M2 记录](docs/M2-记录.md) / [M3 记录](docs/M3-记录.md)
+- [v1.0.0 正式版说明](docs/RELEASE-NOTES-v1.0.0.md)
+- [剩余功能执行计划](docs/剩余功能执行计划.md)
+- [发布流程与签名备份](docs/RELEASE-流程.md)
+- [交接文档](handoff.md)
+- [第三方依赖声明](THIRD-PARTY-NOTICES.md)
+- [隐私政策](PRIVACY.md)
 
 ## 许可证
 
@@ -76,3 +147,12 @@ app/src/main/java/io/github/fallasleeptimetable/
 - **不允许商业使用**；如需商业授权，请通过仓库 Issues 联系作者。
 
 > 这不是 OSI 认可的开源许可证，GitHub 会将其标记为 "View license / Other"。
+
+## 反馈
+
+- 问题与建议：[GitHub Issues](https://github.com/tukinokilyowsoo/FallAsleepTimetable/issues)
+- 也可以在小红书主页留言。
+
+---
+
+© 2026 槻ノ木 響子 · Lyowsoo
