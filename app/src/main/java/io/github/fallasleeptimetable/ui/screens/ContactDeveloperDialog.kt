@@ -115,7 +115,7 @@ fun ContactDeveloperDialog(onDismiss: () -> Unit) {
                                     // 缩小阶段：线性、较快。
                                     avatarScale.animateTo(
                                         0.82f,
-                                        tween(durationMillis = 260, easing = LinearEasing),
+                                        tween(durationMillis = 2000, easing = LinearEasing),
                                     )
                                 }
 
@@ -142,8 +142,22 @@ fun ContactDeveloperDialog(onDismiss: () -> Unit) {
                                     }
                                 }
 
-                                waitForUpOrCancellation()
+                                // 只有真正抬手才触发回弹；手势被系统/父层取消时不弹，
+                                // 避免按住不动时反复出现"放大-缩小"的尺寸波动。
+                                val up = waitForUpOrCancellation()
                                 longPressJob.cancel()
+
+                                if (up == null) {
+                                    vibrationJob?.cancel()
+                                    vibrator?.cancel()
+                                    scope.launch {
+                                        avatarScale.animateTo(
+                                            1f,
+                                            tween(durationMillis = 120, easing = LinearEasing),
+                                        )
+                                    }
+                                    return@awaitEachGesture
+                                }
 
                                 if (longPressed) {
                                     vibrationJob?.cancel()

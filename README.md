@@ -6,7 +6,7 @@
 
 于是乎就有了这个完全离线、超轻量、无广告、完全免费、长期维护的 Material You 课程表！
 
-> 当前测试版：**v1.1.0-beta3** · 稳定版：v1.0.0 · Android 8.0+ · arm64-v8a
+> 当前测试版：**v1.1.0-beta4** · 稳定版：v1.0.0 · Android 8.0+ · arm64-v8a
 
 ## Tomo 推荐使用 FallAsleep 课程表！
 
@@ -80,9 +80,9 @@
 
 测试版在 Releases 中标记为 Pre-release：
 
-- 版本：`v1.1.0-beta3`
-- 文件：`FallAsleepTimetable_arm64_v1.1.0-beta3.apk`
-- SHA-256：`2ab5c2002f77b2050e001b719391603ad91982dcecc79983f45170ea36f643ef`
+- 版本：`v1.1.0-beta4`
+- 文件：`FallAsleepTimetable_arm64_v1.1.0-beta4.apk`
+- SHA-256：`fcd8d07039b2513ec290c9c35d1e550f24b08d7c1db8a919a96fd63f56d1267a`
 
 说明：
 

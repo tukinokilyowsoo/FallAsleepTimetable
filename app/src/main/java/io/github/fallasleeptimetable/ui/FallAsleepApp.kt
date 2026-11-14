@@ -57,6 +57,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -116,6 +117,14 @@ fun FallAsleepApp(
     val message by scheduleViewModel.message.collectAsStateWithLifecycle()
 
     var destination by rememberSaveable { mutableStateOf(AppDestination.Schedule) }
+    // 动画结束后落定的目标页；今日 <-> 设置切换时据此隐藏下层课表，减少一层全屏绘制。
+    var settledDestination by remember { mutableStateOf(AppDestination.Schedule) }
+    LaunchedEffect(destination) {
+        if (destination != settledDestination) {
+            delay(200)
+            settledDestination = destination
+        }
+    }
     var fabExpanded by remember { mutableStateOf(false) }
     var editorRequest by remember { mutableStateOf<EditorRequest?>(null) }
     var showTimetablePicker by remember { mutableStateOf(false) }
@@ -280,6 +289,10 @@ fun FallAsleepApp(
         fabExpanded = false
     }
 
+    val drawScheduleUnderlay = destination == AppDestination.Schedule ||
+        settledDestination == AppDestination.Schedule ||
+        backProgress > 0f
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val compact = maxWidth < 600.dp
 
@@ -304,6 +317,7 @@ fun FallAsleepApp(
                         onHideStatusBarChange = onHideStatusBarChange,
                         onShowWelcome = onShowWelcome,
                         onShareClick = { showShareSheet = true },
+                        drawScheduleUnderlay = drawScheduleUnderlay,
                         backProgress = backProgress,
                     )
                 }
@@ -366,6 +380,7 @@ fun FallAsleepApp(
                         onHideStatusBarChange = onHideStatusBarChange,
                         onShowWelcome = onShowWelcome,
                         onShareClick = { showShareSheet = true },
+                        drawScheduleUnderlay = drawScheduleUnderlay,
                         backProgress = backProgress,
                     )
                 }
@@ -650,6 +665,7 @@ private fun AppContent(
     onHideStatusBarChange: (Boolean) -> Unit,
     onShowWelcome: () -> Unit,
     onShareClick: () -> Unit,
+    drawScheduleUnderlay: Boolean,
     backProgress: Float,
 ) {
     val scheduleContent: @Composable () -> Unit = {
@@ -668,13 +684,21 @@ private fun AppContent(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 课表始终垫在最下层，今日/设置通过预测式返回滑开时可以真实露出课表。
+        // 课表垫在最下层；预测式返回和从课表进入子页时需要绘制，
+        // 今日 <-> 设置互切时子页完全盖住课表，跳过绘制以减少一层全屏内容。
         Box(
-            modifier = if (destination == AppDestination.Schedule) {
-                Modifier.fillMaxSize()
-            } else {
-                Modifier.fillMaxSize().clearAndSetSemantics {}
-            },
+            modifier = Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    if (drawScheduleUnderlay) drawContent()
+                }
+                .then(
+                    if (destination == AppDestination.Schedule) {
+                        Modifier
+                    } else {
+                        Modifier.clearAndSetSemantics {}
+                    },
+                ),
         ) {
             scheduleContent()
         }
@@ -687,14 +711,17 @@ private fun AppContent(
             label = "destination",
         ) { dest ->
             if (dest != AppDestination.Schedule) {
-                Box(
-                    modifier = Modifier
+                val overlayModifier = if (backProgress > 0f) {
+                    Modifier
                         .fillMaxSize()
                         .graphicsLayer {
                             translationX = backProgress * size.width * 0.25f
                             alpha = 1f - backProgress * 0.15f
-                        },
-                ) {
+                        }
+                } else {
+                    Modifier.fillMaxSize()
+                }
+                Box(modifier = overlayModifier) {
                     when (dest) {
                         AppDestination.Today -> TodayScreen(state = state)
                         AppDestination.Settings -> SettingsScreen(
