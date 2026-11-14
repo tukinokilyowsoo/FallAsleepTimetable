@@ -40,6 +40,7 @@ object UpdateChecker {
     suspend fun check(
         source: UpdateSource,
         currentVersion: String = BuildConfig.VERSION_NAME,
+        includePrerelease: Boolean = true,
     ): UpdateCheckResult = withContext(Dispatchers.IO) {
         val url = when (source) {
             UpdateSource.GITHUB -> API_URL
@@ -49,7 +50,10 @@ object UpdateChecker {
         val releases = JSONArray(body)
         val release = (0 until releases.length())
             .mapNotNull { releases.optJSONObject(it) }
-            .firstOrNull { !it.optBoolean("draft", false) }
+            .firstOrNull { release ->
+                !release.optBoolean("draft", false) &&
+                    (includePrerelease || !release.optBoolean("prerelease", false))
+            }
             ?: throw IOException("没有找到可用的 Release")
 
         val tag = release.optString("tag_name").trim()
@@ -102,7 +106,29 @@ object UpdateChecker {
             val localPart = localParts.getOrElse(index) { 0 }
             if (remotePart != localPart) return remotePart > localPart
         }
-        return false
+        // 主版本相同再比较预览标记：beta2 > beta1，正式版 > 同号 beta。
+        val remotePre = prerelease(remote)
+        val localPre = prerelease(local)
+        if (remotePre == null && localPre == null) return false
+        if (remotePre == null) return true
+        if (localPre == null) return false
+        return comparePrerelease(remotePre, localPre) > 0
+    }
+
+    private data class PreRelease(val label: String, val number: Int)
+
+    private fun prerelease(version: String): PreRelease? {
+        val normalized = version.trim().removePrefix("v").removePrefix("V")
+        val suffix = normalized.substringAfter('-', "").substringBefore('+')
+        if (suffix.isBlank()) return null
+        val number = suffix.takeLastWhile { it.isDigit() }.toIntOrNull() ?: 0
+        val label = suffix.dropLastWhile { it.isDigit() }
+        return PreRelease(label, number)
+    }
+
+    private fun comparePrerelease(a: PreRelease, b: PreRelease): Int {
+        val labelCompare = a.label.compareTo(b.label)
+        return if (labelCompare != 0) labelCompare else a.number.compareTo(b.number)
     }
 
     private fun versionNumbers(version: String): List<Int> {

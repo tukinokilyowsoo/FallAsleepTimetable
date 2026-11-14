@@ -111,6 +111,7 @@ fun SettingsScreen(
     onDeleteTimetable: (Long) -> Unit,
     onRenameTimetable: (Long, String) -> Unit,
     onExportIcs: () -> String?,
+    onBetaPlanChanged: (Boolean) -> Unit,
     message: String?,
     onConsumeMessage: () -> Unit,
 ) {
@@ -146,6 +147,9 @@ fun SettingsScreen(
     }
     var updateReminders by remember {
         mutableStateOf(settingsPrefs.getBoolean("update_reminders", true))
+    }
+    var betaPlan by remember {
+        mutableStateOf(settingsPrefs.getBoolean("beta_plan", false))
     }
     var widgetTheme by remember { mutableStateOf(WidgetThemeSetting.get(context)) }
     fun applyWidgetTheme(value: String) {
@@ -703,7 +707,7 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("FallAsleep 课程表") },
-                    supportingContent = { Text("版本 ${BuildConfig.VERSION_NAME} · 离线课程表") },
+                    supportingContent = { Text("版本 ${BuildConfig.VERSION_NAME}") },
                     leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -734,6 +738,34 @@ fun SettingsScreen(
                                     style = MaterialTheme.typography.labelMedium,
                                 )
                             }
+                        }
+                    },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Beta 计划") },
+                    supportingContent = {
+                        Text(
+                            if (betaPlan) {
+                                "已加入，将自动提醒 Beta 版本"
+                            } else {
+                                "加入后自动提醒 Beta 版本"
+                            },
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
+                    trailingContent = {
+                        TextButton(
+                            onClick = {
+                                betaPlan = !betaPlan
+                                settingsPrefs.edit()
+                                    .putBoolean("beta_plan", betaPlan)
+                                    .apply()
+                                onBetaPlanChanged(betaPlan)
+                            },
+                        ) {
+                            Text(if (betaPlan) "退出 Beta 计划" else "加入 Beta 计划")
                         }
                     },
                 )

@@ -53,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -86,6 +87,10 @@ import io.github.fallasleeptimetable.ui.screens.TimetablePickerDialog
 import io.github.fallasleeptimetable.ui.screens.TodayScreen
 import io.github.fallasleeptimetable.ui.screens.UpdateDialog
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+/** 自动检查更新的最小间隔：6 小时。手动「检查更新」不受限制。 */
+private const val AUTO_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
 
 private enum class AppDestination(
     @StringRes val labelRes: Int,
@@ -127,6 +132,7 @@ fun FallAsleepApp(
     val snackbarHostState = remember { SnackbarHostState() }
     var updateSnackbar by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by remember { mutableStateOf(false) }
+    val updateScope = rememberCoroutineScope()
 
     LaunchedEffect(startEduImport, state.ready, state.term) {
         if (startEduImport && state.ready) {
@@ -222,9 +228,14 @@ fun FallAsleepApp(
 
     LaunchedEffect(Unit) {
         if (!settingsPrefs.getBoolean("update_reminders", true)) return@LaunchedEffect
+        val now = System.currentTimeMillis()
+        val lastCheck = settingsPrefs.getLong("update_last_check_at", 0L)
+        if (now - lastCheck < AUTO_UPDATE_CHECK_INTERVAL_MS) return@LaunchedEffect
+        settingsPrefs.edit().putLong("update_last_check_at", now).apply()
         val source = UpdateSource.fromKey(settingsPrefs.getString("update_source", null))
+        val includePrerelease = settingsPrefs.getBoolean("beta_plan", false)
         val result = runCatching {
-            UpdateChecker.check(source, BuildConfig.VERSION_NAME)
+            UpdateChecker.check(source, BuildConfig.VERSION_NAME, includePrerelease)
         }.getOrNull()
         if (result is UpdateCheckResult.Available) {
             updateSnackbar = result.info
@@ -296,6 +307,25 @@ fun FallAsleepApp(
                         onHideStatusBarChange = onHideStatusBarChange,
                         onShowWelcome = onShowWelcome,
                         onShareClick = { showShareSheet = true },
+                        onBetaPlanChanged = { joined ->
+                            if (joined) {
+                                updateScope.launch {
+                                    val source = UpdateSource.fromKey(
+                                        settingsPrefs.getString("update_source", null),
+                                    )
+                                    val result = runCatching {
+                                        UpdateChecker.check(
+                                            source,
+                                            BuildConfig.VERSION_NAME,
+                                            includePrerelease = true,
+                                        )
+                                    }.getOrNull()
+                                    if (result is UpdateCheckResult.Available) {
+                                        updateSnackbar = result.info
+                                    }
+                                }
+                            }
+                        },
                         backProgress = backProgress,
                     )
                 }
@@ -358,6 +388,25 @@ fun FallAsleepApp(
                         onHideStatusBarChange = onHideStatusBarChange,
                         onShowWelcome = onShowWelcome,
                         onShareClick = { showShareSheet = true },
+                        onBetaPlanChanged = { joined ->
+                            if (joined) {
+                                updateScope.launch {
+                                    val source = UpdateSource.fromKey(
+                                        settingsPrefs.getString("update_source", null),
+                                    )
+                                    val result = runCatching {
+                                        UpdateChecker.check(
+                                            source,
+                                            BuildConfig.VERSION_NAME,
+                                            includePrerelease = true,
+                                        )
+                                    }.getOrNull()
+                                    if (result is UpdateCheckResult.Available) {
+                                        updateSnackbar = result.info
+                                    }
+                                }
+                            }
+                        },
                         backProgress = backProgress,
                     )
                 }
@@ -642,6 +691,7 @@ private fun AppContent(
     onHideStatusBarChange: (Boolean) -> Unit,
     onShowWelcome: () -> Unit,
     onShareClick: () -> Unit,
+    onBetaPlanChanged: (Boolean) -> Unit,
     backProgress: Float,
 ) {
     val scheduleContent: @Composable () -> Unit = {
@@ -706,6 +756,7 @@ private fun AppContent(
                             onDeleteTimetable = viewModel::deleteTimetable,
                             onRenameTimetable = viewModel::renameTimetable,
                             onExportIcs = viewModel::exportTimetableIcs,
+                            onBetaPlanChanged = onBetaPlanChanged,
                             message = message,
                             onConsumeMessage = onConsumeMessage,
                         )
