@@ -14,7 +14,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +57,9 @@ fun UpdateDialog(
         )
     }
     var state by remember { mutableStateOf<UpdateState>(UpdateState.Checking) }
+    var betaPlan by remember {
+        mutableStateOf(prefs.getBoolean("beta_plan", false))
+    }
     val scope = rememberCoroutineScope()
 
     fun check(selected: UpdateSource) {
@@ -111,6 +116,32 @@ fun UpdateDialog(
                         )
                     }
                 }
+
+                HorizontalDivider()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "加入 Beta 计划",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = "自动提醒 Beta 版本更新",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = betaPlan,
+                        onCheckedChange = { checked ->
+                            betaPlan = checked
+                            prefs.edit().putBoolean("beta_plan", checked).apply()
+                        },
+                    )
+                }
+                HorizontalDivider()
 
                 when (val current = state) {
                     UpdateState.Checking -> Row(

@@ -10,7 +10,9 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.widget.Toast
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
@@ -110,7 +112,11 @@ fun ContactDeveloperDialog(onDismiss: () -> Unit) {
                             awaitEachGesture {
                                 awaitFirstDown(requireUnconsumed = false)
                                 scope.launch {
-                                    avatarScale.animateTo(0.96f, tween(90))
+                                    // 缩小阶段：线性、较快。
+                                    avatarScale.animateTo(
+                                        0.82f,
+                                        tween(durationMillis = 260, easing = LinearEasing),
+                                    )
                                 }
 
                                 var longPressed = false
@@ -161,12 +167,21 @@ fun ContactDeveloperDialog(onDismiss: () -> Unit) {
                                     }
                                 }
 
-                                // 回弹：略微超过原尺寸后再回到 100%。
+                                // 回弹：先弹到 120%，再用更缓的弹簧收回 100%。
                                 scope.launch {
-                                    avatarScale.animateTo(1.04f, tween(110))
+                                    avatarScale.animateTo(
+                                        1.2f,
+                                        spring(
+                                            dampingRatio = 0.45f,
+                                            stiffness = Spring.StiffnessMediumLow,
+                                        ),
+                                    )
                                     avatarScale.animateTo(
                                         1f,
-                                        tween(160, easing = FastOutSlowInEasing),
+                                        spring(
+                                            dampingRatio = 0.65f,
+                                            stiffness = Spring.StiffnessMediumLow,
+                                        ),
                                     )
                                 }
                             }
@@ -235,7 +250,7 @@ fun ContactDeveloperDialog(onDismiss: () -> Unit) {
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "更多项目与反馈请前往 GitHub 主页，或在小红书留言。",
+                    text = "报告问题请前往 GitHub 提交 Issue，或在小红书主页留言。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
