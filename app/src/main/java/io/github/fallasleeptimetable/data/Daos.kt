@@ -123,6 +123,9 @@ interface CourseDao {
     @Query("DELETE FROM course WHERE id = :id")
     suspend fun deleteCourse(id: Long)
 
+    @Query("DELETE FROM course WHERE timetableId = :timetableId")
+    suspend fun deleteCoursesByTimetable(timetableId: Long)
+
     @Insert
     suspend fun insertSession(session: CourseSessionEntity): Long
 
@@ -132,17 +135,17 @@ interface CourseDao {
 
 @Dao
 interface TimeSlotDao {
-    @Query("SELECT * FROM time_slot WHERE termId = :termId ORDER BY period")
-    fun observeByTerm(termId: Long): Flow<List<TimeSlotEntity>>
+    @Query("SELECT * FROM time_slot WHERE timetableId = :timetableId ORDER BY period")
+    fun observeByTimetable(timetableId: Long): Flow<List<TimeSlotEntity>>
 
-    @Query("SELECT * FROM time_slot WHERE termId = :termId ORDER BY period")
-    suspend fun getByTerm(termId: Long): List<TimeSlotEntity>
+    @Query("SELECT * FROM time_slot WHERE timetableId = :timetableId ORDER BY period")
+    suspend fun getByTimetable(timetableId: Long): List<TimeSlotEntity>
 
-    @Query("SELECT COUNT(*) FROM time_slot WHERE termId = :termId")
-    suspend fun countByTerm(termId: Long): Int
+    @Query("SELECT COUNT(*) FROM time_slot WHERE timetableId = :timetableId")
+    suspend fun countByTimetable(timetableId: Long): Int
 
-    @Query("DELETE FROM time_slot WHERE termId = :termId")
-    suspend fun deleteByTerm(termId: Long)
+    @Query("DELETE FROM time_slot WHERE timetableId = :timetableId")
+    suspend fun deleteByTimetable(timetableId: Long)
 
     @Insert
     suspend fun insertAll(slots: List<TimeSlotEntity>)

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Material 3 adaptive icon foreground.
+    108 x 108 dp canvas, artwork kept inside the 66 dp safe-zone circle.
+    Shapes: a crescent moon above two rounded schedule rows.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Crescent moon (Material dark_mode geometry, scaled 2x). -->
+    <path
+        android:fillColor="#E7EBFF"
+        android:pathData="M54,24a18,18 0 1,0 18,18c0,-0.92 -0.08,-1.84 -0.2,-2.72a10.78,10.78 0 0,1 -8.8,4.52a10.81,10.81 0 0,1 -6.28,-19.6c-0.88,-0.12 -1.8,-0.2 -2.72,-0.2Z" />
+
+    <!-- Schedule rows, fully rounded caps. -->
+    <path
+        android:fillColor="#E7EBFF"
+        android:pathData="M36,64h36a3,3 0 0,1 0,6h-36a3,3 0 0,1 0,-6z" />
+    <path
+        android:fillColor="#E7EBFF"
+        android:pathData="M36,76h18a3,3 0 0,1 0,6h-18a3,3 0 0,1 0,-6z" />
+</vector>

@@ -21,6 +21,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -52,9 +53,10 @@ private data class TimePickRequest(
 @Composable
 fun ClassTimeSettingsDialog(
     term: TermEntity,
+    timetableName: String,
     slots: List<TimeSlotEntity>,
     onDismiss: () -> Unit,
-    onSave: (periodsPerDay: Int, slots: List<Pair<Int, Int>>) -> Unit,
+    onSave: (periodsPerDay: Int, slots: List<Pair<Int, Int>>, applyGlobally: Boolean) -> Unit,
 ) {
     val initialTimes = remember {
         val fromDb = slots.sortedBy { it.period }.map { it.startMinute to it.endMinute }
@@ -74,6 +76,7 @@ fun ClassTimeSettingsDialog(
     }
 
     var step by rememberSaveable { mutableStateOf(0) }
+    var applyGlobally by rememberSaveable { mutableStateOf(false) }
     var morningCount by rememberSaveable { mutableStateOf(initialMorningCount) }
     var afternoonCount by rememberSaveable { mutableStateOf(initialAfternoonCount) }
     var duration by rememberSaveable { mutableStateOf(initialDuration) }
@@ -177,6 +180,11 @@ fun ClassTimeSettingsDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text("修改上课时间", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        text = "目标课表：$timetableName",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
 
                     if (step == 0) {
                         Text(
@@ -254,6 +262,29 @@ fun ClassTimeSettingsDialog(
                                         markChanged()
                                     }
                                 },
+                            )
+                        }
+
+                        HorizontalDivider()
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "将当前时间作用全局",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Text(
+                                    text = "保存后同步到其他所有课表",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = applyGlobally,
+                                onCheckedChange = { applyGlobally = it },
                             )
                         }
 
@@ -365,7 +396,7 @@ fun ClassTimeSettingsDialog(
                                     if (invalid) {
                                         errorText = "时间设置有误，请检查每节的起止时间"
                                     } else {
-                                        onSave(total, times.toList())
+                                        onSave(total, times.toList(), applyGlobally)
                                     }
                                 },
                             ) {

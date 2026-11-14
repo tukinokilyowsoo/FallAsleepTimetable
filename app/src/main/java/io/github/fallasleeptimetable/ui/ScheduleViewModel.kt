@@ -39,6 +39,8 @@ data class ScheduleUiState(
     val selectedTimetable: TimetableEntity? = null,
     val courses: List<CourseWithSessions> = emptyList(),
     val timeSlots: List<TimeSlotEntity> = emptyList(),
+    /** 当前课表每天的节数（随课表绑定）。 */
+    val periodsPerDay: Int = 12,
     val currentWeek: Int = 1,
     val actualWeek: Int = 1,
     val isCurrentWeek: Boolean = true,
@@ -90,7 +92,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
             else -> combine(
                 repository.courses(table.id),
-                repository.timeSlots(term.id),
+                repository.timeSlots(table.id),
                 weekOverride,
             ) { courses, slots, override ->
                 buildState(baseState, courses, slots, override)
@@ -197,8 +199,11 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             report("还没有学期，无法导入")
             return
         }
+        val sourceId = uiState.value.selectedTimetable?.id
         viewModelScope.launch {
-            runCatching { repository.importTimetableFromText(term.id, text, applySettings) }
+            runCatching {
+                repository.importTimetableFromText(term.id, sourceId, text, applySettings)
+            }
                 .onSuccess { result ->
                     selectTimetable(result.timetableId)
                     weekOverride.value = null
@@ -264,8 +269,9 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
     fun createTimetable(name: String) {
         val term = uiState.value.term ?: return
+        val sourceId = uiState.value.selectedTimetable?.id
         viewModelScope.launch {
-            val id = repository.createTimetable(term.id, name)
+            val id = repository.createTimetable(term.id, name, sourceId)
             selectTimetable(id)
             WidgetUpdater.updateAll(appContext)
         }
@@ -301,10 +307,23 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun updateTimeSlots(periodsPerDay: Int, slots: List<Pair<Int, Int>>) {
-        val term = uiState.value.term ?: return
+    fun timeSlots(timetableId: Long) = repository.timeSlots(timetableId)
+
+    suspend fun loadTimeSlots(timetableId: Long) = repository.loadTimeSlots(timetableId)
+
+    fun updateTimeSlots(
+        timetableId: Long,
+        periodsPerDay: Int,
+        slots: List<Pair<Int, Int>>,
+        applyGlobally: Boolean = false,
+    ) {
         viewModelScope.launch {
-            repository.replaceTimeSlots(term.id, periodsPerDay, slots)
+            repository.replaceTimeSlots(
+                timetableId = timetableId,
+                periodsPerDay = periodsPerDay,
+                slots = slots,
+                applyGlobally = applyGlobally,
+            )
             WidgetUpdater.updateAll(appContext)
         }
     }
@@ -327,6 +346,8 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             selectedTimetable = baseState.table,
             courses = courses,
             timeSlots = slots,
+            periodsPerDay = baseState.table?.periodsPerDay?.coerceAtLeast(1)
+                ?: slots.size.coerceAtLeast(1),
             currentWeek = week,
             actualWeek = actualWeek,
             isCurrentWeek = week == actualWeek,

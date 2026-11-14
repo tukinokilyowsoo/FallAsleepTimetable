@@ -84,7 +84,7 @@ object WidgetDataLoader {
             term = term,
             timetable = timetable,
             courses = db.courseDao().getWithSessions(timetable.id),
-            timeSlots = db.timeSlotDao().getByTerm(term.id),
+            timeSlots = db.timeSlotDao().getByTimetable(timetable.id),
             config = config,
         )
     }

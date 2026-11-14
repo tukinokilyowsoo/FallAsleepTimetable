@@ -39,6 +39,10 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,7 +69,12 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.fallasleeptimetable.BuildConfig
 import io.github.fallasleeptimetable.R
+import io.github.fallasleeptimetable.data.update.UpdateCheckResult
+import io.github.fallasleeptimetable.data.update.UpdateChecker
+import io.github.fallasleeptimetable.data.update.UpdateInfo
+import io.github.fallasleeptimetable.data.update.UpdateSource
 import io.github.fallasleeptimetable.ui.screens.CourseEditorDialog
 import io.github.fallasleeptimetable.ui.screens.CreateTimetableDialog
 import io.github.fallasleeptimetable.ui.screens.EduImportActivity
@@ -75,6 +84,7 @@ import io.github.fallasleeptimetable.ui.screens.SettingsScreen
 import io.github.fallasleeptimetable.ui.screens.ShareExportSheet
 import io.github.fallasleeptimetable.ui.screens.TimetablePickerDialog
 import io.github.fallasleeptimetable.ui.screens.TodayScreen
+import io.github.fallasleeptimetable.ui.screens.UpdateDialog
 import kotlinx.coroutines.delay
 
 private enum class AppDestination(
@@ -95,6 +105,8 @@ fun FallAsleepApp(
     hideStatusBar: Boolean,
     onHideStatusBarChange: (Boolean) -> Unit,
     onShowWelcome: () -> Unit,
+    startEduImport: Boolean,
+    onStartEduImportHandled: () -> Unit,
 ) {
     val scheduleViewModel: ScheduleViewModel = viewModel()
     val state by scheduleViewModel.uiState.collectAsStateWithLifecycle()
@@ -112,6 +124,20 @@ fun FallAsleepApp(
     var backProgress by remember { mutableFloatStateOf(0f) }
     var showShareSheet by remember { mutableStateOf(false) }
     var shareMessage by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var updateSnackbar by remember { mutableStateOf<UpdateInfo?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(startEduImport, state.ready, state.term) {
+        if (startEduImport && state.ready) {
+            if (state.term == null) {
+                eduMessage = "还没有学期，无法导入"
+            } else {
+                showEduUrlDialog = true
+            }
+            onStartEduImportHandled()
+        }
+    }
 
     // 预测式返回：全屏时退出全屏；在「今日/设置」时回到「课表」。
     // 手势过程中按进度位移、淡出当前页面，取消则自动回弹。
@@ -188,6 +214,37 @@ fun FallAsleepApp(
     var eduUrlInput by remember {
         mutableStateOf(settingsPrefs.getString("edu_url", "") ?: "")
     }
+    LaunchedEffect(showEduUrlDialog) {
+        if (showEduUrlDialog) {
+            eduUrlInput = settingsPrefs.getString("edu_url", "") ?: ""
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!settingsPrefs.getBoolean("update_reminders", true)) return@LaunchedEffect
+        val source = UpdateSource.fromKey(settingsPrefs.getString("update_source", null))
+        val result = runCatching {
+            UpdateChecker.check(source, BuildConfig.VERSION_NAME)
+        }.getOrNull()
+        if (result is UpdateCheckResult.Available) {
+            updateSnackbar = result.info
+        }
+    }
+
+    LaunchedEffect(updateSnackbar, destination) {
+        val info = updateSnackbar ?: return@LaunchedEffect
+        if (destination != AppDestination.Schedule) return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "发现新版本 ${info.tag}",
+            actionLabel = "更新",
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            showUpdateDialog = true
+        }
+        updateSnackbar = null
+    }
     val eduImportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -196,11 +253,17 @@ fun FallAsleepApp(
                 ?: -1L
             if (id > 0) {
                 scheduleViewModel.selectTimetable(id)
-                val name = result.data
-                    ?.getStringExtra(EduImportActivity.EXTRA_TIMETABLE_NAME)
-                    ?.takeIf { it.isNotBlank() }
-                    ?: "导入的课表"
-                renameTarget = id to name
+                val overwritten = result.data?.getBooleanExtra(
+                    EduImportActivity.EXTRA_OVERWRITTEN,
+                    false,
+                ) ?: false
+                if (!overwritten) {
+                    val name = result.data
+                        ?.getStringExtra(EduImportActivity.EXTRA_TIMETABLE_NAME)
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "导入的课表"
+                    renameTarget = id to name
+                }
             }
         }
     }
@@ -355,13 +418,31 @@ fun FallAsleepApp(
                     .padding(end = 16.dp, bottom = if (compact) 96.dp else 16.dp),
             )
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    bottom = when {
+                        fullscreen -> 16.dp
+                        destination == AppDestination.Schedule && compact -> 168.dp
+                        destination == AppDestination.Schedule -> 88.dp
+                        compact -> 88.dp
+                        else -> 16.dp
+                    },
+                ),
+        )
     }
 
     editorRequest?.let { request ->
         state.term?.let { term ->
             CourseEditorDialog(
                 request = request,
-                term = term,
+                term = term.copy(periodsPerDay = state.periodsPerDay),
                 onDismiss = { editorRequest = null },
                 onSave = { draft ->
                     scheduleViewModel.saveCourse(request.courseId, request.sessionId, draft)
@@ -435,6 +516,14 @@ fun FallAsleepApp(
                                 eduImportLauncher.launch(
                                     Intent(context, EduImportActivity::class.java)
                                         .putExtra(EduImportActivity.EXTRA_TERM_ID, term.id)
+                                        .putExtra(
+                                            EduImportActivity.EXTRA_CURRENT_TIMETABLE_ID,
+                                            state.selectedTimetable?.id ?: -1L,
+                                        )
+                                        .putExtra(
+                                            EduImportActivity.EXTRA_CURRENT_TIMETABLE_NAME,
+                                            state.selectedTimetable?.name,
+                                        )
                                         .putExtra(EduImportActivity.EXTRA_URL, normalized),
                                 )
                             }
@@ -525,6 +614,13 @@ fun FallAsleepApp(
             },
         )
     }
+
+    if (showUpdateDialog) {
+        UpdateDialog(
+            currentVersion = BuildConfig.VERSION_NAME,
+            onDismiss = { showUpdateDialog = false },
+        )
+    }
 }
 
 @Composable
@@ -604,6 +700,7 @@ private fun AppContent(
                             onShowWelcome = onShowWelcome,
                             onUpdateTerm = viewModel::updateTerm,
                             onUpdateTimeSlots = viewModel::updateTimeSlots,
+                            onLoadTimeSlots = viewModel::loadTimeSlots,
                             onSelectTimetable = viewModel::selectTimetable,
                             onCreateTimetable = viewModel::createTimetable,
                             onDeleteTimetable = viewModel::deleteTimetable,

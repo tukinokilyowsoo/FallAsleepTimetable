@@ -120,7 +120,7 @@ private fun WeekScheduleContent(
                 }
             }
 
-            val periods = data.term.periodsPerDay.coerceAtLeast(1)
+            val periods = data.timetable.periodsPerDay.coerceAtLeast(1)
             val gridHeight = (height - 64.dp).coerceAtLeast(96.dp)
             val unit = (gridHeight / periods).coerceIn(12.dp, 36.dp)
 

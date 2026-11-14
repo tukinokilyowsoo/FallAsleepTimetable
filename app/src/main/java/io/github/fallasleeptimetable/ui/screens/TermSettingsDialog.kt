@@ -57,7 +57,6 @@ fun TermSettingsDialog(
     var name by rememberSaveable { mutableStateOf(term.name) }
     var startDate by remember { mutableStateOf(LocalDate.ofEpochDay(term.startDateEpochDay)) }
     var totalWeeks by rememberSaveable { mutableStateOf(term.totalWeeks) }
-    var periodsPerDay by rememberSaveable { mutableStateOf(term.periodsPerDay) }
     var showSaturday by rememberSaveable { mutableStateOf(term.showSaturday) }
     var showSunday by rememberSaveable { mutableStateOf(term.showSunday) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -119,14 +118,6 @@ fun TermSettingsDialog(
                         suffix = " 周",
                         onChange = { totalWeeks = it },
                     )
-                    TermStepper(
-                        label = "每天节数",
-                        value = periodsPerDay,
-                        min = 6,
-                        max = 16,
-                        suffix = " 节",
-                        onChange = { periodsPerDay = it },
-                    )
 
                     HorizontalDivider()
 
@@ -156,7 +147,6 @@ fun TermSettingsDialog(
                                         name = name.trim().ifBlank { term.name },
                                         startDateEpochDay = startDate.toEpochDay(),
                                         totalWeeks = totalWeeks,
-                                        periodsPerDay = periodsPerDay,
                                         showSaturday = showSaturday,
                                         showSunday = showSunday,
                                     ),

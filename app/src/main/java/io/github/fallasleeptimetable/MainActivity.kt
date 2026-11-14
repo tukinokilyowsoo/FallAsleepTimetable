@@ -46,6 +46,7 @@ class MainActivity : ComponentActivity() {
             var showWelcome by rememberSaveable {
                 mutableStateOf(!prefs.getBoolean("welcome_seen", false))
             }
+            var openEduImportAfterWelcome by rememberSaveable { mutableStateOf(false) }
 
             FallAsleepTheme(
                 dynamicColor = dynamicColor,
@@ -53,9 +54,10 @@ class MainActivity : ComponentActivity() {
             ) {
                 if (showWelcome) {
                     WelcomeScreen(
-                        onFinish = {
+                        onFinish = { startAdding ->
                             prefs.edit().putBoolean("welcome_seen", true).apply()
                             showWelcome = false
+                            openEduImportAfterWelcome = startAdding
                         },
                     )
                 } else {
@@ -83,6 +85,8 @@ class MainActivity : ComponentActivity() {
                         prefs.edit().putBoolean("welcome_seen", false).apply()
                         showWelcome = true
                     },
+                    startEduImport = openEduImportAfterWelcome,
+                    onStartEduImportHandled = { openEduImportAfterWelcome = false },
                 )
                 }
             }

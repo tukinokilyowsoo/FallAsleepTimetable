@@ -32,7 +32,7 @@ class IcsTimetableTest {
     )
 
     private fun slot(period: Int, start: Int, end: Int) = TimeSlotEntity(
-        termId = term.id,
+        timetableId = term.id,
         period = period,
         startMinute = start,
         endMinute = end,

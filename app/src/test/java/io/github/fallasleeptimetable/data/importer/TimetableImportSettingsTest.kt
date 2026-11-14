@@ -25,10 +25,10 @@ class TimetableImportSettingsTest {
     )
 
     private val slots = listOf(
-        TimeSlotEntity(termId = 1, period = 1, startMinute = 480, endMinute = 525),
-        TimeSlotEntity(termId = 1, period = 2, startMinute = 535, endMinute = 580),
-        TimeSlotEntity(termId = 1, period = 3, startMinute = 600, endMinute = 645),
-        TimeSlotEntity(termId = 1, period = 4, startMinute = 655, endMinute = 700),
+        TimeSlotEntity(timetableId = 1, period = 1, startMinute = 480, endMinute = 525),
+        TimeSlotEntity(timetableId = 1, period = 2, startMinute = 535, endMinute = 580),
+        TimeSlotEntity(timetableId = 1, period = 3, startMinute = 600, endMinute = 645),
+        TimeSlotEntity(timetableId = 1, period = 4, startMinute = 655, endMinute = 700),
     )
 
     private val courses = listOf(

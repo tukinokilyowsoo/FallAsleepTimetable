@@ -1,13 +1,11 @@
 package io.github.fallasleeptimetable.ui.screens
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,10 +68,15 @@ private val welcomePages = listOf(
         title = "接入系统待办，不占用后台",
         body = "课表写入系统日历与待办，提醒交给系统，无需常驻后台。",
     ),
+    WelcomePage(
+        number = "05",
+        title = "开始使用",
+        body = "登录教务系统，一键导入整张课表；也可以稍后手动添加课程。",
+    ),
 )
 
 @Composable
-fun WelcomeScreen(onFinish: () -> Unit) {
+fun WelcomeScreen(onFinish: (Boolean) -> Unit) {
     val pagerState = rememberPagerState(pageCount = { welcomePages.size })
     val scope = rememberCoroutineScope()
     val isLastPage = pagerState.currentPage == welcomePages.lastIndex
@@ -94,7 +97,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                 exit = fadeOut(tween(120)),
                 modifier = Modifier.align(Alignment.TopEnd),
             ) {
-                TextButton(onClick = onFinish) {
+                TextButton(onClick = { onFinish(false) }) {
                     Text("跳过")
                 }
             }
@@ -160,13 +163,25 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                             lineHeight = 28.sp,
                             modifier = Modifier.widthIn(max = 520.dp),
                         )
+                        if (page == welcomePages.lastIndex) {
+                            Spacer(modifier = Modifier.height(32.dp))
+                            Button(
+                                onClick = { onFinish(true) },
+                                modifier = Modifier
+                                    .height(52.dp)
+                                    .widthIn(min = 140.dp),
+                                shape = CircleShape,
+                            ) {
+                                Text("开始使用")
+                            }
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
@@ -193,34 +208,6 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                                         },
                                     ),
                             )
-                        }
-                    }
-
-                    Button(
-                        onClick = {
-                            if (isLastPage) {
-                                onFinish()
-                            } else {
-                                scope.launch {
-                                    pagerState.animateScrollToPage(
-                                        pagerState.currentPage + 1,
-                                    )
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .height(52.dp)
-                            .widthIn(min = 140.dp),
-                        shape = CircleShape,
-                    ) {
-                        AnimatedContent(
-                            targetState = isLastPage,
-                            transitionSpec = {
-                                fadeIn(tween(180)) togetherWith fadeOut(tween(120))
-                            },
-                            label = "welcomeButtonLabel",
-                        ) { last ->
-                            Text(if (last) "开始使用" else "下一步")
                         }
                     }
                 }

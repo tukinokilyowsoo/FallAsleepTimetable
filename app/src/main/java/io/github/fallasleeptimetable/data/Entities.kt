@@ -1,5 +1,6 @@
 package io.github.fallasleeptimetable.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -33,6 +34,9 @@ data class TimetableEntity(
     val termId: Long,
     val name: String,
     val sortOrder: Int = 0,
+    /** 这张课表每天的节数；上课时间配置随课表独立保存。 */
+    @ColumnInfo(defaultValue = "12")
+    val periodsPerDay: Int = 12,
 )
 
 @Entity(
@@ -84,17 +88,17 @@ data class CourseSessionEntity(
     tableName = "time_slot",
     foreignKeys = [
         ForeignKey(
-            entity = TermEntity::class,
+            entity = TimetableEntity::class,
             parentColumns = ["id"],
-            childColumns = ["termId"],
+            childColumns = ["timetableId"],
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("termId")],
+    indices = [Index("timetableId")],
 )
 data class TimeSlotEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val termId: Long,
+    val timetableId: Long,
     val period: Int,
     val startMinute: Int,
     val endMinute: Int,

@@ -80,7 +80,7 @@ object TimetableExporter {
                 put("name", term.name)
                 put("startDateEpochDay", term.startDateEpochDay)
                 put("totalWeeks", term.totalWeeks)
-                put("periodsPerDay", term.periodsPerDay)
+                put("periodsPerDay", timetable.periodsPerDay)
                 put("showSaturday", term.showSaturday)
                 put("showSunday", term.showSunday)
             },

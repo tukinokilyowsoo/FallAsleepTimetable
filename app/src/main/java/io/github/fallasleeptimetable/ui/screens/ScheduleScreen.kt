@@ -247,7 +247,7 @@ fun ScheduleScreen(
                                                     dayOfWeek = day,
                                                     startPeriod = period,
                                                     periodCount = 2.coerceAtMost(
-                                                        term.periodsPerDay - period + 1,
+                                                        state.periodsPerDay - period + 1,
                                                     ),
                                                     startWeek = 1,
                                                     endWeek = term.totalWeeks,
@@ -302,7 +302,7 @@ fun ScheduleScreen(
                                                 dayOfWeek = day,
                                                 startPeriod = period,
                                                 periodCount = 2.coerceAtMost(
-                                                    term.periodsPerDay - period + 1,
+                                                    state.periodsPerDay - period + 1,
                                                 ),
                                                 startWeek = 1,
                                                 endWeek = term.totalWeeks,
@@ -482,7 +482,7 @@ private fun WeekBoard(
                 val horizontalState = rememberScrollState()
                 val verticalState = rememberScrollState()
                 val headerHeight = 44.dp
-                val rowHeight = ((maxHeight - headerHeight) / term.periodsPerDay)
+                val rowHeight = ((maxHeight - headerHeight) / state.periodsPerDay)
                     .coerceIn(40.dp, 72.dp)
                 val availableDayWidth = (maxWidth - timeWidth) / days.size
                 val dayWidth = if (compact) {
@@ -519,10 +519,10 @@ private fun WeekBoard(
                             Row(
                                 modifier = Modifier
                                     .width(contentWidth)
-                                    .height(rowHeight * term.periodsPerDay),
+                                    .height(rowHeight * state.periodsPerDay),
                             ) {
                                 TimeColumn(
-                                    periods = term.periodsPerDay,
+                                    periods = state.periodsPerDay,
                                     rowHeight = rowHeight,
                                     slots = state.timeSlots,
                                     width = timeWidth,
@@ -535,7 +535,7 @@ private fun WeekBoard(
                                         )
                                     DayColumn(
                                         day = day,
-                                        periods = term.periodsPerDay,
+                                        periods = state.periodsPerDay,
                                         rowHeight = rowHeight,
                                         sessions = daySessions,
                                         isToday = day == state.todayDayOfWeek &&

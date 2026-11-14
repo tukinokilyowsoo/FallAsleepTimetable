@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -72,17 +73,22 @@ class EduImportActivity : ComponentActivity() {
 
         val termId = intent.getLongExtra(EXTRA_TERM_ID, -1L)
         val initialUrl = intent.getStringExtra(EXTRA_URL)
+        val currentTimetableId = intent.getLongExtra(EXTRA_CURRENT_TIMETABLE_ID, -1L)
+        val currentTimetableName = intent.getStringExtra(EXTRA_CURRENT_TIMETABLE_NAME)
         setContent {
             FallAsleepTheme {
                 EduImportScreen(
                     termId = termId,
                     initialUrl = initialUrl,
-                    onImported = { timetableId, timetableName ->
+                    currentTimetableId = currentTimetableId,
+                    currentTimetableName = currentTimetableName,
+                    onImported = { timetableId, timetableName, overwritten ->
                         setResult(
                             RESULT_OK,
                             Intent()
                                 .putExtra(EXTRA_TIMETABLE_ID, timetableId)
-                                .putExtra(EXTRA_TIMETABLE_NAME, timetableName),
+                                .putExtra(EXTRA_TIMETABLE_NAME, timetableName)
+                                .putExtra(EXTRA_OVERWRITTEN, overwritten),
                         )
                         finish()
                     },
@@ -96,6 +102,9 @@ class EduImportActivity : ComponentActivity() {
         const val EXTRA_TERM_ID = "extra_term_id"
         const val EXTRA_TIMETABLE_ID = "extra_timetable_id"
         const val EXTRA_TIMETABLE_NAME = "extra_timetable_name"
+        const val EXTRA_CURRENT_TIMETABLE_ID = "extra_current_timetable_id"
+        const val EXTRA_CURRENT_TIMETABLE_NAME = "extra_current_timetable_name"
+        const val EXTRA_OVERWRITTEN = "extra_overwritten"
         const val EXTRA_URL = "extra_url"
     }
 }
@@ -121,7 +130,9 @@ private const val GRAB_PAGE_JS = """
 fun EduImportScreen(
     termId: Long,
     initialUrl: String? = null,
-    onImported: (Long, String) -> Unit,
+    currentTimetableId: Long = -1L,
+    currentTimetableName: String? = null,
+    onImported: (Long, String, Boolean) -> Unit,
     onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -140,6 +151,7 @@ fun EduImportScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
+    var overwriteCurrent by rememberSaveable { mutableStateOf(false) }
 
     val webView = remember {
         WebView(context).apply {
@@ -306,19 +318,43 @@ fun EduImportScreen(
                         ParsePreview(
                             result = result,
                             importing = importing,
+                            overwriteCurrent = overwriteCurrent,
+                            canOverwrite = currentTimetableId > 0,
+                            currentTimetableName = currentTimetableName,
+                            onOverwriteChange = { overwriteCurrent = it },
                             onBack = { parsed = null },
                             onImport = {
                                 if (importing) return@ParsePreview
                                 importing = true
                                 scope.launch {
                                     val outcome = runCatching {
-                                        if (termId <= 0) throw IllegalStateException("没有有效学期")
+                                        val overwrite = overwriteCurrent &&
+                                            currentTimetableId > 0
+                                        if (!overwrite && termId <= 0) {
+                                            throw IllegalStateException("没有有效学期")
+                                        }
                                         withContext(Dispatchers.IO) {
-                                            repository.importParsedTimetable(termId, result.timetable)
+                                            if (overwrite) {
+                                                repository.importParsedTimetableInto(
+                                                    timetableId = currentTimetableId,
+                                                    parsed = result.timetable,
+                                                )
+                                            } else {
+                                                repository.importParsedTimetable(
+                                                    termId = termId,
+                                                    sourceTimetableId = currentTimetableId
+                                                        .takeIf { it > 0 },
+                                                    parsed = result.timetable,
+                                                )
+                                            }
                                         }
                                     }
                                     outcome.onSuccess {
-                                        onImported(it.timetableId, it.timetableName)
+                                        onImported(
+                                            it.timetableId,
+                                            it.timetableName,
+                                            overwriteCurrent && currentTimetableId > 0,
+                                        )
                                     }
                                         .onFailure {
                                             importing = false
@@ -358,6 +394,10 @@ fun EduImportScreen(
 private fun ParsePreview(
     result: EduParseResult,
     importing: Boolean,
+    overwriteCurrent: Boolean,
+    canOverwrite: Boolean,
+    currentTimetableName: String?,
+    onOverwriteChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onImport: () -> Unit,
 ) {
@@ -423,6 +463,33 @@ private fun ParsePreview(
             }
         }
 
+        if (canOverwrite) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "覆盖当前课表",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = "清空「${currentTimetableName ?: "当前课表"}」的课程，" +
+                            "沿用它的上课时间设置",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = overwriteCurrent,
+                    onCheckedChange = onOverwriteChange,
+                    enabled = !importing,
+                )
+            }
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -432,7 +499,14 @@ private fun ParsePreview(
             TextButton(onClick = onBack, enabled = !importing) { Text("返回") }
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = onImport, enabled = !importing) {
-                Text(if (importing) "导入中…" else "导入 ${result.timetable.courses.size} 门课程")
+                Text(
+                    when {
+                        importing -> "导入中…"
+                        overwriteCurrent && canOverwrite ->
+                            "覆盖导入 ${result.timetable.courses.size} 门课程"
+                        else -> "导入 ${result.timetable.courses.size} 门课程"
+                    },
+                )
             }
         }
     }

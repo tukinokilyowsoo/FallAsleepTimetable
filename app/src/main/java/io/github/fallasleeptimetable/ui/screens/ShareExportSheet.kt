@@ -225,7 +225,7 @@ fun ShareExportSheet(
                     val outcome = withContext(Dispatchers.Default) {
                         runCatching {
                             ScheduleImageExporter.renderPng(
-                                term = term,
+                                term = term.copy(periodsPerDay = state.periodsPerDay),
                                 timetableName = table.name,
                                 courses = state.courses,
                                 timeSlots = state.timeSlots,
@@ -279,8 +279,8 @@ fun ShareExportSheet(
             text = {
                 Text(
                     "这份 JSON 还包含：\n" + details.joinToString("\n") +
-                        "\n\n恢复会覆盖当前学期（以及该学期下所有课表）共用的" +
-                        "开学日期、周数和上课时间。",
+                        "\n\n恢复会更新学期的开学日期与周数，" +
+                        "节次时间会写到新导入的课表中，不影响其他课表。",
                 )
             },
             confirmButton = {

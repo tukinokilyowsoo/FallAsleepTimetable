@@ -1,6 +1,7 @@
 package io.github.fallasleeptimetable.ui.screens
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -15,12 +16,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -67,11 +70,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import io.github.fallasleeptimetable.BuildConfig
 import io.github.fallasleeptimetable.R
 import io.github.fallasleeptimetable.data.TermEntity
+import io.github.fallasleeptimetable.data.TimeSlotEntity
 import io.github.fallasleeptimetable.data.calendar.CalendarScheduleExporter
 import io.github.fallasleeptimetable.data.diagnostics.ImportLog
 import io.github.fallasleeptimetable.data.TimetableEntity
@@ -99,7 +104,8 @@ fun SettingsScreen(
     onHideStatusBarChange: (Boolean) -> Unit,
     onShowWelcome: () -> Unit,
     onUpdateTerm: (TermEntity) -> Unit,
-    onUpdateTimeSlots: (Int, List<Pair<Int, Int>>) -> Unit,
+    onUpdateTimeSlots: (Long, Int, List<Pair<Int, Int>>, Boolean) -> Unit,
+    onLoadTimeSlots: suspend (Long) -> List<TimeSlotEntity>,
     onSelectTimetable: (Long) -> Unit,
     onCreateTimetable: (String) -> Unit,
     onDeleteTimetable: (Long) -> Unit,
@@ -109,7 +115,10 @@ fun SettingsScreen(
     onConsumeMessage: () -> Unit,
 ) {
     var showTermDialog by remember { mutableStateOf(false) }
+    var showTimeTargetPicker by remember { mutableStateOf(false) }
     var showClassTimeDialog by remember { mutableStateOf(false) }
+    var timeTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var timeTargetSlots by remember { mutableStateOf<List<TimeSlotEntity>>(emptyList()) }
     var showThemeColorDialog by remember { mutableStateOf(false) }
     var widgetThemeMenuOpen by remember { mutableStateOf(false) }
     var termMenuOpen by remember { mutableStateOf(false) }
@@ -126,8 +135,18 @@ fun SettingsScreen(
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showContactDeveloper by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
+    var showEduUrlDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val settingsPrefs = remember {
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    }
+    var eduUrl by remember {
+        mutableStateOf(settingsPrefs.getString("edu_url", "").orEmpty())
+    }
+    var updateReminders by remember {
+        mutableStateOf(settingsPrefs.getBoolean("update_reminders", true))
+    }
     var widgetTheme by remember { mutableStateOf(WidgetThemeSetting.get(context)) }
     fun applyWidgetTheme(value: String) {
         WidgetThemeSetting.set(context, value)
@@ -480,7 +499,7 @@ fun SettingsScreen(
                             val start = LocalDate.ofEpochDay(term.startDateEpochDay)
                             Text(
                                 "开学 ${start.format(settingsDateFormat)} · 共 ${term.totalWeeks} 周 · " +
-                                    "每天 ${term.periodsPerDay} 节",
+                                    "当前课表每天 ${state.periodsPerDay} 节",
                             )
                         }
                     },
@@ -504,7 +523,7 @@ fun SettingsScreen(
                                         text = { Text("修改上课时间") },
                                         onClick = {
                                             termMenuOpen = false
-                                            showClassTimeDialog = true
+                                            showTimeTargetPicker = true
                                         },
                                     )
                                 }
@@ -555,6 +574,25 @@ fun SettingsScreen(
                     headlineContent = { Text("新建课表") },
                     leadingContent = { Icon(Icons.Filled.Add, contentDescription = null) },
                     modifier = Modifier.clickable { showCreateTimetable = true },
+                )
+            }
+            item { HorizontalDivider() }
+
+            item { SectionHeader("教务导入") }
+            item {
+                ListItem(
+                    headlineContent = { Text("教务系统网址") },
+                    supportingContent = {
+                        Text(
+                            text = eduUrl.ifBlank { "尚未设置，导入时填写后会自动记住" },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                    trailingContent = {
+                        TextButton(onClick = { showEduUrlDialog = true }) { Text("编辑") }
+                    },
                 )
             }
             item { HorizontalDivider() }
@@ -639,16 +677,6 @@ fun SettingsScreen(
             item { SectionHeader("关于") }
             item {
                 ListItem(
-                    headlineContent = { Text("检查更新") },
-                    supportingContent = {
-                        Text("当前版本 ${BuildConfig.VERSION_NAME} · 支持 GitHub / 国内镜像")
-                    },
-                    leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
-                    modifier = Modifier.clickable { showUpdateDialog = true },
-                )
-            }
-            item {
-                ListItem(
                     headlineContent = { Text("联系开发者") },
                     supportingContent = { Text("点此提交问题反馈") },
                     leadingContent = {
@@ -677,6 +705,37 @@ fun SettingsScreen(
                     headlineContent = { Text("FallAsleep 课程表") },
                     supportingContent = { Text("版本 ${BuildConfig.VERSION_NAME} · 离线课程表") },
                     leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(
+                                onClick = {
+                                    updateReminders = !updateReminders
+                                    settingsPrefs.edit()
+                                        .putBoolean("update_reminders", updateReminders)
+                                        .apply()
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                            ) {
+                                Text(
+                                    text = if (updateReminders) {
+                                        "拒收更新提醒"
+                                    } else {
+                                        "接收更新提醒"
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                            TextButton(
+                                onClick = { showUpdateDialog = true },
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                            ) {
+                                Text(
+                                    text = "检查更新",
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                        }
+                    },
                 )
             }
             item {
@@ -720,15 +779,69 @@ fun SettingsScreen(
         )
     }
 
+    if (showTimeTargetPicker) {
+        val defaultId = timeTargetId
+            ?: state.selectedTimetable?.id
+            ?: state.timetables.firstOrNull()?.id
+        var pickedId by remember { mutableStateOf(defaultId) }
+        AlertDialog(
+            onDismissRequest = { showTimeTargetPicker = false },
+            title = { Text("选择目标课表") },
+            text = {
+                Column {
+                    Text(
+                        text = "上课时间会保存到选中的课表，各课表互不影响。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    state.timetables.forEach { table ->
+                        ListItem(
+                            headlineContent = { Text(table.name) },
+                            supportingContent = { Text("每天 ${table.periodsPerDay} 节") },
+                            leadingContent = {
+                                RadioButton(
+                                    selected = pickedId == table.id,
+                                    onClick = { pickedId = table.id },
+                                )
+                            },
+                            modifier = Modifier.clickable { pickedId = table.id },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = pickedId != null,
+                    onClick = {
+                        val id = pickedId ?: return@TextButton
+                        showTimeTargetPicker = false
+                        scope.launch {
+                            timeTargetSlots = runCatching { onLoadTimeSlots(id) }
+                                .getOrDefault(emptyList())
+                            timeTargetId = id
+                            showClassTimeDialog = true
+                        }
+                    },
+                ) { Text("下一步") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimeTargetPicker = false }) { Text("取消") }
+            },
+        )
+    }
+
     if (showClassTimeDialog) {
         val term = state.term
-        if (term != null) {
+        val target = state.timetables.firstOrNull { it.id == timeTargetId }
+        if (term != null && target != null) {
             ClassTimeSettingsDialog(
                 term = term,
-                slots = state.timeSlots,
+                timetableName = target.name,
+                slots = timeTargetSlots,
                 onDismiss = { showClassTimeDialog = false },
-                onSave = { periods, slots ->
-                    onUpdateTimeSlots(periods, slots)
+                onSave = { periods, slots, applyGlobally ->
+                    onUpdateTimeSlots(target.id, periods, slots, applyGlobally)
                     showClassTimeDialog = false
                 },
             )
@@ -896,6 +1009,50 @@ fun SettingsScreen(
         UpdateDialog(
             currentVersion = BuildConfig.VERSION_NAME,
             onDismiss = { showUpdateDialog = false },
+        )
+    }
+
+    if (showEduUrlDialog) {
+        var urlInput by remember { mutableStateOf(eduUrl) }
+        AlertDialog(
+            onDismissRequest = { showEduUrlDialog = false },
+            title = { Text("教务系统网址") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = urlInput,
+                        onValueChange = { urlInput = it },
+                        label = { Text("网址") },
+                        placeholder = { Text("https://jwgl.example.edu.cn") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "导入课表时会自动填入这个网址，可随时修改或清空。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val raw = urlInput.trim()
+                        val normalized = when {
+                            raw.isEmpty() -> ""
+                            raw.startsWith("http://") || raw.startsWith("https://") -> raw
+                            else -> "http://$raw"
+                        }
+                        settingsPrefs.edit().putString("edu_url", normalized).apply()
+                        eduUrl = normalized
+                        showEduUrlDialog = false
+                    },
+                ) { Text("保存") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEduUrlDialog = false }) { Text("取消") }
+            },
         )
     }
 

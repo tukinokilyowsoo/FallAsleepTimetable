@@ -27,7 +27,9 @@ class ScheduleRepository(private val db: AppDatabase) {
     fun courses(timetableId: Long): Flow<List<CourseWithSessions>> =
         courseDao.observeWithSessions(timetableId)
 
-    fun timeSlots(termId: Long) = timeSlotDao.observeByTerm(termId)
+    fun timeSlots(timetableId: Long) = timeSlotDao.observeByTimetable(timetableId)
+
+    suspend fun loadTimeSlots(timetableId: Long) = timeSlotDao.getByTimetable(timetableId)
 
     suspend fun ensureSeed(debugSample: Boolean) {
         if (termDao.count() > 0) return
@@ -45,8 +47,10 @@ class ScheduleRepository(private val db: AppDatabase) {
                     showSunday = false,
                 ),
             )
-            timeSlotDao.insertAll(defaultTimeSlots(termId, 1..12))
-            val tableId = timetableDao.insert(TimetableEntity(termId = termId, name = "我的课表"))
+            val tableId = timetableDao.insert(
+                TimetableEntity(termId = termId, name = "我的课表", periodsPerDay = 12),
+            )
+            timeSlotDao.insertAll(defaultTimeSlots(tableId, 1..12))
             if (debugSample) insertSampleCourses(tableId)
         }
     }
@@ -109,44 +113,75 @@ class ScheduleRepository(private val db: AppDatabase) {
     }
 
     suspend fun updateTerm(updated: TermEntity) {
+        termDao.update(updated)
+    }
+
+    /**
+     * 写入某张课表的上课时间。applyGlobally 为 true 时同步覆盖其他所有课表。
+     */
+    suspend fun replaceTimeSlots(
+        timetableId: Long,
+        periodsPerDay: Int,
+        slots: List<Pair<Int, Int>>,
+        applyGlobally: Boolean = false,
+    ) {
+        require(slots.isNotEmpty()) { "至少需要一节课" }
         db.withTransaction {
-            termDao.update(updated)
-            val slots = timeSlotDao.getByTerm(updated.id)
-            if (slots.size < updated.periodsPerDay) {
-                val from = slots.size + 1
-                timeSlotDao.insertAll(defaultTimeSlots(updated.id, from..updated.periodsPerDay))
+            val table = timetableDao.get(timetableId) ?: return@withTransaction
+            writeTimeSlots(table, periodsPerDay, slots)
+            if (applyGlobally) {
+                timetableDao.getAll()
+                    .filter { it.id != table.id }
+                    .forEach { other -> writeTimeSlots(other, periodsPerDay, slots) }
             }
         }
     }
 
-    suspend fun replaceTimeSlots(termId: Long, periodsPerDay: Int, slots: List<Pair<Int, Int>>) {
-        require(slots.isNotEmpty()) { "至少需要一节课" }
-        db.withTransaction {
-            val term = termDao.get(termId) ?: return@withTransaction
-            termDao.update(term.copy(periodsPerDay = periodsPerDay))
-            timeSlotDao.deleteByTerm(termId)
-            timeSlotDao.insertAll(
-                slots.mapIndexed { index, (start, end) ->
-                    TimeSlotEntity(
-                        termId = termId,
-                        period = index + 1,
-                        startMinute = start,
-                        endMinute = end,
-                    )
-                },
-            )
-        }
+    private suspend fun writeTimeSlots(
+        table: TimetableEntity,
+        periodsPerDay: Int,
+        slots: List<Pair<Int, Int>>,
+    ) {
+        timetableDao.update(table.copy(periodsPerDay = periodsPerDay))
+        timeSlotDao.deleteByTimetable(table.id)
+        timeSlotDao.insertAll(
+            slots.mapIndexed { index, (start, end) ->
+                TimeSlotEntity(
+                    timetableId = table.id,
+                    period = index + 1,
+                    startMinute = start,
+                    endMinute = end,
+                )
+            },
+        )
     }
 
-    suspend fun createTimetable(termId: Long, name: String): Long = db.withTransaction {
+    /**
+     * 新建课表默认沿用当前课表的上课时间配置。
+     */
+    suspend fun createTimetable(
+        termId: Long,
+        name: String,
+        sourceTimetableId: Long? = null,
+    ): Long = db.withTransaction {
         val order = timetableDao.getAll().size
-        timetableDao.insert(
-            TimetableEntity(
-                termId = termId,
-                name = name.trim().ifBlank { "新课程表" },
-                sortOrder = order,
-            ),
+        val source = sourceTimetableId?.let { timetableDao.get(it) }
+        val sourceSlots = source?.let { timeSlotDao.getByTimetable(it.id) }
+            .orEmpty()
+            .map { it.startMinute to it.endMinute }
+        val slots = sourceSlots.ifEmpty {
+            defaultTimeSlots(0, 1..12).map { it.startMinute to it.endMinute }
+        }
+        val periods = source?.periodsPerDay?.takeIf { it > 0 } ?: slots.size
+        val table = TimetableEntity(
+            termId = termId,
+            name = name.trim().ifBlank { "新课程表" },
+            sortOrder = order,
+            periodsPerDay = periods,
         )
+        val tableId = timetableDao.insert(table)
+        writeTimeSlots(table.copy(id = tableId), periods, slots)
+        tableId
     }
 
     suspend fun deleteTimetable(timetableId: Long) {
@@ -155,36 +190,61 @@ class ScheduleRepository(private val db: AppDatabase) {
 
     suspend fun importTimetableFromText(
         termId: Long,
+        sourceTimetableId: Long?,
         text: String,
         applySettings: Boolean = false,
     ): ImportResult {
         val term = termDao.get(termId) ?: error("还没有学期，无法导入")
-        val slots = timeSlotDao.getByTerm(termId)
+        val slots = sourceTimetableId
+            ?.let { timeSlotDao.getByTimetable(it) }
+            .orEmpty()
         val parsed = TimetableFileImporter.parse(text, term, slots)
-        return importParsedTimetable(termId, parsed, applySettings)
+        return importParsedTimetable(termId, sourceTimetableId, parsed, applySettings)
     }
 
     suspend fun importParsedTimetable(
         termId: Long,
+        sourceTimetableId: Long?,
         parsed: ImportedTimetable,
         applySettings: Boolean = false,
     ): ImportResult {
         require(parsed.courses.isNotEmpty()) { "没有可导入的课程" }
         return db.withTransaction {
             if (applySettings) {
-                applyImportedSettings(termId, parsed)
+                applyImportedTermSettings(termId, parsed)
             }
+            val source = sourceTimetableId?.let { timetableDao.get(it) }
             val existing = timetableDao.getAll()
             val existingNames = existing.map { it.name }.toSet()
             val baseName = parsed.name.trim().ifBlank { "导入的课表" }
             val name = if (baseName in existingNames) "$baseName（导入）" else baseName
-            val tableId = timetableDao.insert(
-                TimetableEntity(
-                    termId = termId,
-                    name = name,
-                    sortOrder = existing.size,
-                ),
+
+            val importedSlots = parsed.timeSlots
+                ?.takeIf { applySettings && it.isNotEmpty() }
+            val sourceSlots = source?.let { timeSlotDao.getByTimetable(it.id) }
+                .orEmpty()
+                .map { it.startMinute to it.endMinute }
+            val slots = importedSlots
+                ?.map { it.startMinute to it.endMinute }
+                ?: sourceSlots.ifEmpty {
+                    defaultTimeSlots(0, 1..12).map { it.startMinute to it.endMinute }
+                }
+            val maxImportedPeriod = importedSlots?.maxOfOrNull { it.period } ?: 0
+            val periods = maxOf(
+                maxImportedPeriod,
+                parsed.term?.periodsPerDay ?: 0,
+                source?.periodsPerDay ?: 0,
+                slots.size,
+            ).coerceIn(1, 30)
+
+            val table = TimetableEntity(
+                termId = termId,
+                name = name,
+                sortOrder = existing.size,
+                periodsPerDay = periods,
             )
+            val tableId = timetableDao.insert(table)
+            writeTimeSlots(table.copy(id = tableId), periods, slots)
             insertImportedCourses(tableId, parsed)
             ImportResult(
                 timetableId = tableId,
@@ -195,45 +255,42 @@ class ScheduleRepository(private val db: AppDatabase) {
     }
 
     /**
-     * 把 JSON 里携带的学期设置与节次时间写回当前学期。
-     * 注意：会影响该学期下的所有课表，调用前必须由 UI 明确确认。
+     * 覆盖导入：清空目标课表的课程后写入新课程，保留原有上课时间配置与课表名称。
      */
-    private suspend fun applyImportedSettings(termId: Long, parsed: ImportedTimetable) {
+    suspend fun importParsedTimetableInto(
+        timetableId: Long,
+        parsed: ImportedTimetable,
+    ): ImportResult {
+        require(parsed.courses.isNotEmpty()) { "没有可导入的课程" }
+        return db.withTransaction {
+            val table = timetableDao.get(timetableId) ?: error("目标课表不存在")
+            courseDao.deleteCoursesByTimetable(timetableId = table.id)
+            insertImportedCourses(table.id, parsed)
+            ImportResult(
+                timetableId = table.id,
+                courseCount = parsed.courses.size,
+                timetableName = table.name,
+            )
+        }
+    }
+
+    /**
+     * 把 JSON 里携带的学期设置写回当前学期。
+     * 节次时间不再随学期共享，而是写到新导入的课表上。
+     */
+    private suspend fun applyImportedTermSettings(termId: Long, parsed: ImportedTimetable) {
         val term = termDao.get(termId) ?: return
         val imported = parsed.term
-        val slots = parsed.timeSlots
-        val maxSlotPeriod = slots?.maxOfOrNull { it.period } ?: 0
-        val periods = maxOf(
-            term.periodsPerDay,
-            imported?.periodsPerDay ?: 0,
-            maxSlotPeriod,
-        ).coerceIn(1, 30)
-
         val startDate = (imported?.startDateEpochDay ?: term.startDateEpochDay)
             .coerceIn(MIN_EPOCH_DAY, MAX_EPOCH_DAY)
         termDao.update(
             term.copy(
                 startDateEpochDay = startDate,
                 totalWeeks = (imported?.totalWeeks ?: term.totalWeeks).coerceIn(1, 60),
-                periodsPerDay = periods,
                 showSaturday = imported?.showSaturday ?: term.showSaturday,
                 showSunday = imported?.showSunday ?: term.showSunday,
             ),
         )
-
-        if (!slots.isNullOrEmpty()) {
-            timeSlotDao.deleteByTerm(termId)
-            timeSlotDao.insertAll(
-                slots.map { slot ->
-                    TimeSlotEntity(
-                        termId = termId,
-                        period = slot.period,
-                        startMinute = slot.startMinute,
-                        endMinute = slot.endMinute,
-                    )
-                },
-            )
-        }
     }
 
     private suspend fun insertImportedCourses(tableId: Long, parsed: ImportedTimetable) {
@@ -320,7 +377,7 @@ class ScheduleRepository(private val db: AppDatabase) {
         const val MAX_EPOCH_DAY = 47847L
     }
 
-    private fun defaultTimeSlots(termId: Long, periods: IntRange): List<TimeSlotEntity> {
+    private fun defaultTimeSlots(timetableId: Long, periods: IntRange): List<TimeSlotEntity> {
         val times = listOf(
             480 to 525,
             535 to 580,
@@ -337,7 +394,12 @@ class ScheduleRepository(private val db: AppDatabase) {
         )
         return periods.map { period ->
             val (start, end) = times.getOrElse(period - 1) { 480 to 525 }
-            TimeSlotEntity(termId = termId, period = period, startMinute = start, endMinute = end)
+            TimeSlotEntity(
+                timetableId = timetableId,
+                period = period,
+                startMinute = start,
+                endMinute = end,
+            )
         }
     }
 }
