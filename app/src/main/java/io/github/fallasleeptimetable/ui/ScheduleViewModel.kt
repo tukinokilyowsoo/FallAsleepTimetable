@@ -318,12 +318,15 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         applyGlobally: Boolean = false,
     ) {
         viewModelScope.launch {
-            repository.replaceTimeSlots(
+            val outOfRange = repository.replaceTimeSlots(
                 timetableId = timetableId,
                 periodsPerDay = periodsPerDay,
                 slots = slots,
                 applyGlobally = applyGlobally,
             )
+            if (outOfRange > 0) {
+                _message.value = "上课时间已保存；有 $outOfRange 个课程超出新的节数，可能不会显示"
+            }
             WidgetUpdater.updateAll(appContext)
         }
     }

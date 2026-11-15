@@ -1,6 +1,7 @@
 package io.github.fallasleeptimetable.data
 
 import androidx.room.withTransaction
+import io.github.fallasleeptimetable.data.importer.ImportedSession
 import io.github.fallasleeptimetable.data.importer.ImportedTimetable
 import io.github.fallasleeptimetable.data.importer.TimetableFileImporter
 import io.github.fallasleeptimetable.domain.CourseDraft
@@ -124,25 +125,41 @@ class ScheduleRepository(private val db: AppDatabase) {
         periodsPerDay: Int,
         slots: List<Pair<Int, Int>>,
         applyGlobally: Boolean = false,
-    ) {
+    ): Int {
         require(slots.isNotEmpty()) { "至少需要一节课" }
-        db.withTransaction {
-            val table = timetableDao.get(timetableId) ?: return@withTransaction
-            writeTimeSlots(table, periodsPerDay, slots)
+        return db.withTransaction {
+            val table = timetableDao.get(timetableId) ?: return@withTransaction 0
+            val affected = mutableListOf<TimetableEntity>()
+            writeTimeSlots(table, slots)
+            affected += table
             if (applyGlobally) {
                 timetableDao.getAll()
                     .filter { it.id != table.id }
-                    .forEach { other -> writeTimeSlots(other, periodsPerDay, slots) }
+                    .forEach { other ->
+                        writeTimeSlots(other, slots)
+                        affected += other
+                    }
+            }
+            // 返回因节数变少而可能不再显示的课程数量，供界面提示。
+            val periods = slots.size
+            affected.sumOf { affectedTable ->
+                courseDao.getWithSessions(affectedTable.id).sumOf { course ->
+                    course.sessions.count {
+                        it.startPeriod + it.periodCount - 1 > periods
+                    }
+                }
             }
         }
     }
 
     private suspend fun writeTimeSlots(
         table: TimetableEntity,
-        periodsPerDay: Int,
         slots: List<Pair<Int, Int>>,
     ) {
-        timetableDao.update(table.copy(periodsPerDay = periodsPerDay))
+        require(slots.isNotEmpty()) { "至少需要一节课" }
+        // 节数以实际写入的时间槽数量为准，避免网格出现没有时间的空行。
+        val periods = slots.size.coerceIn(1, 30)
+        timetableDao.update(table.copy(periodsPerDay = periods))
         timeSlotDao.deleteByTimetable(table.id)
         timeSlotDao.insertAll(
             slots.mapIndexed { index, (start, end) ->
@@ -172,15 +189,14 @@ class ScheduleRepository(private val db: AppDatabase) {
         val slots = sourceSlots.ifEmpty {
             defaultTimeSlots(0, 1..12).map { it.startMinute to it.endMinute }
         }
-        val periods = source?.periodsPerDay?.takeIf { it > 0 } ?: slots.size
         val table = TimetableEntity(
             termId = termId,
             name = name.trim().ifBlank { "新课程表" },
             sortOrder = order,
-            periodsPerDay = periods,
+            periodsPerDay = slots.size,
         )
         val tableId = timetableDao.insert(table)
-        writeTimeSlots(table.copy(id = tableId), periods, slots)
+        writeTimeSlots(table.copy(id = tableId), slots)
         tableId
     }
 
@@ -224,27 +240,22 @@ class ScheduleRepository(private val db: AppDatabase) {
             val sourceSlots = source?.let { timeSlotDao.getByTimetable(it.id) }
                 .orEmpty()
                 .map { it.startMinute to it.endMinute }
-            val slots = importedSlots
+            val baseSlots = importedSlots
                 ?.map { it.startMinute to it.endMinute }
                 ?: sourceSlots.ifEmpty {
                     defaultTimeSlots(0, 1..12).map { it.startMinute to it.endMinute }
                 }
-            val maxImportedPeriod = importedSlots?.maxOfOrNull { it.period } ?: 0
-            val periods = maxOf(
-                maxImportedPeriod,
-                parsed.term?.periodsPerDay ?: 0,
-                source?.periodsPerDay ?: 0,
-                slots.size,
-            ).coerceIn(1, 30)
-
+            val slots = padSlots(baseSlots, maxOf(baseSlots.size, maxPeriodUsed(parsed)))
+            // 节数严格等于实际使用的时间槽数量；导入的节数只作为展示/兼容字段，
+            // 不能超过实际写入的时间槽，否则网格会出现没有时间的空行。
             val table = TimetableEntity(
                 termId = termId,
                 name = name,
                 sortOrder = existing.size,
-                periodsPerDay = periods,
+                periodsPerDay = slots.size,
             )
             val tableId = timetableDao.insert(table)
-            writeTimeSlots(table.copy(id = tableId), periods, slots)
+            writeTimeSlots(table.copy(id = tableId), slots)
             insertImportedCourses(tableId, parsed)
             ImportResult(
                 timetableId = tableId,
@@ -264,6 +275,19 @@ class ScheduleRepository(private val db: AppDatabase) {
         require(parsed.courses.isNotEmpty()) { "没有可导入的课程" }
         return db.withTransaction {
             val table = timetableDao.get(timetableId) ?: error("目标课表不存在")
+            // 覆盖导入沿用原课表时间；若导入课程用到更多节次，只补缺少的默认时间。
+            val neededPeriods = maxPeriodUsed(parsed)
+            if (neededPeriods > table.periodsPerDay) {
+                val existingPeriods = timeSlotDao.getByTimetable(table.id)
+                    .map { it.period }
+                    .toSet()
+                val missing = defaultTimeSlots(table.id, 1..neededPeriods)
+                    .filter { it.period !in existingPeriods }
+                if (missing.isNotEmpty()) {
+                    timeSlotDao.insertAll(missing)
+                }
+                timetableDao.update(table.copy(periodsPerDay = neededPeriods))
+            }
             courseDao.deleteCoursesByTimetable(timetableId = table.id)
             insertImportedCourses(table.id, parsed)
             ImportResult(
@@ -304,19 +328,50 @@ class ScheduleRepository(private val db: AppDatabase) {
                 ),
             )
             course.sessions.forEach { session ->
+                val safe = sanitizeSession(session)
                 courseDao.insertSession(
                     CourseSessionEntity(
                         courseId = courseId,
-                        dayOfWeek = session.dayOfWeek,
-                        startPeriod = session.startPeriod,
-                        periodCount = session.periodCount,
-                        startWeek = session.startWeek,
-                        endWeek = session.endWeek,
-                        parity = session.parity,
-                        room = session.room,
+                        dayOfWeek = safe.dayOfWeek,
+                        startPeriod = safe.startPeriod,
+                        periodCount = safe.periodCount,
+                        startWeek = safe.startWeek,
+                        endWeek = safe.endWeek,
+                        parity = safe.parity,
+                        room = safe.room,
                     ),
                 )
             }
+        }
+    }
+
+    private fun sanitizeSession(session: ImportedSession): ImportedSession {
+        val startPeriod = session.startPeriod.coerceIn(1, MAX_PERIODS)
+        val startWeek = session.startWeek.coerceIn(1, MAX_WEEKS)
+        return session.copy(
+            dayOfWeek = session.dayOfWeek.coerceIn(1, 7),
+            startPeriod = startPeriod,
+            periodCount = session.periodCount.coerceIn(1, MAX_PERIODS - startPeriod + 1),
+            startWeek = startWeek,
+            endWeek = session.endWeek.coerceIn(startWeek, MAX_WEEKS),
+            parity = session.parity.coerceIn(0, 2),
+        )
+    }
+
+    private fun maxPeriodUsed(parsed: ImportedTimetable): Int =
+        parsed.courses
+            .flatMap { it.sessions }
+            .map { sanitizeSession(it) }
+            .maxOfOrNull { it.startPeriod + it.periodCount - 1 }
+            ?: 0
+
+    /** 用默认时间补齐缺少的节次，保证导入课程不会因为课表节数不足而消失。 */
+    private fun padSlots(slots: List<Pair<Int, Int>>, targetCount: Int): List<Pair<Int, Int>> {
+        if (targetCount <= slots.size) return slots
+        val defaults = defaultTimeSlots(0, 1..targetCount)
+        return List(targetCount) { index ->
+            slots.getOrNull(index)
+                ?: (defaults[index].startMinute to defaults[index].endMinute)
         }
     }
 
@@ -375,6 +430,8 @@ class ScheduleRepository(private val db: AppDatabase) {
         // 2000-01-01 .. 2100-12-31，避免损坏文件写入荒唐日期
         const val MIN_EPOCH_DAY = 10957L
         const val MAX_EPOCH_DAY = 47847L
+        const val MAX_PERIODS = 30
+        const val MAX_WEEKS = 60
     }
 
     private fun defaultTimeSlots(timetableId: Long, periods: IntRange): List<TimeSlotEntity> {

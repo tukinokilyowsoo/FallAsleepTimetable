@@ -24,7 +24,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -166,7 +165,8 @@ fun ContactDeveloperDialog(onDismiss: () -> Unit) {
                             .border(1.dp, Color.White, CircleShape)
                             .pointerInput(Unit) {
                                 awaitEachGesture {
-                                    awaitFirstDown(requireUnconsumed = false)
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    down.consume()
                                     scope.launch {
                                         // 缩小阶段：线性、慢速。
                                         avatarScale.animateTo(
@@ -199,12 +199,25 @@ fun ContactDeveloperDialog(onDismiss: () -> Unit) {
                                         }
                                     }
 
-                                    // 只有真正抬手才触发回弹；手势被取消时直接复位，
-                                    // 避免按住不动时出现"放大-缩小"的尺寸波动。
-                                    val up = waitForUpOrCancellation()
+                                    // 自己消费按住期间的所有事件，避免父级滚动容器
+                                    // 消费移动事件、把手势判成取消，导致尺寸来回波动。
+                                    var released = false
+                                    var cancelled = false
+                                    while (!released) {
+                                        val event = awaitPointerEvent()
+                                        val change = event.changes
+                                            .firstOrNull { it.id == down.id }
+                                        if (change == null) {
+                                            cancelled = true
+                                            released = true
+                                        } else if (!change.pressed) {
+                                            released = true
+                                        }
+                                        event.changes.forEach { it.consume() }
+                                    }
                                     longPressJob.cancel()
 
-                                    if (up == null) {
+                                    if (cancelled) {
                                         vibrationJob?.cancel()
                                         vibrator?.cancel()
                                         scope.launch {

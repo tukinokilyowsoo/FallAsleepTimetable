@@ -50,6 +50,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -60,6 +61,7 @@ import io.github.fallasleeptimetable.data.importer.EduScheduleParser
 import io.github.fallasleeptimetable.ui.dayLabel
 import io.github.fallasleeptimetable.ui.periodLabel
 import io.github.fallasleeptimetable.ui.theme.FallAsleepTheme
+import io.github.fallasleeptimetable.ui.theme.ThemeMode
 import io.github.fallasleeptimetable.ui.weekRangeLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -75,8 +77,15 @@ class EduImportActivity : ComponentActivity() {
         val initialUrl = intent.getStringExtra(EXTRA_URL)
         val currentTimetableId = intent.getLongExtra(EXTRA_CURRENT_TIMETABLE_ID, -1L)
         val currentTimetableName = intent.getStringExtra(EXTRA_CURRENT_TIMETABLE_NAME)
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val dynamicColor = prefs.getBoolean("dynamic_color", true)
+        val customColor = prefs.getLong("custom_color", 0L)
         setContent {
-            FallAsleepTheme {
+            FallAsleepTheme(
+                darkTheme = ThemeMode.isDark(this@EduImportActivity),
+                dynamicColor = dynamicColor,
+                customSeed = customColor.takeIf { it != 0L }?.let { Color(it) },
+            ) {
                 EduImportScreen(
                     termId = termId,
                     initialUrl = initialUrl,
@@ -152,6 +161,7 @@ fun EduImportScreen(
     var loading by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var overwriteCurrent by rememberSaveable { mutableStateOf(false) }
+    var pendingOverwriteConfirm by remember { mutableStateOf(false) }
 
     val webView = remember {
         WebView(context).apply {
@@ -244,6 +254,39 @@ fun EduImportScreen(
         }
     }
 
+    fun startImport(result: EduParseResult) {
+        if (importing) return
+        importing = true
+        val overwrite = overwriteCurrent && currentTimetableId > 0
+        scope.launch {
+            val outcome = runCatching {
+                if (!overwrite && termId <= 0) {
+                    throw IllegalStateException("没有有效学期")
+                }
+                withContext(Dispatchers.IO) {
+                    if (overwrite) {
+                        repository.importParsedTimetableInto(
+                            timetableId = currentTimetableId,
+                            parsed = result.timetable,
+                        )
+                    } else {
+                        repository.importParsedTimetable(
+                            termId = termId,
+                            sourceTimetableId = currentTimetableId.takeIf { it > 0 },
+                            parsed = result.timetable,
+                        )
+                    }
+                }
+            }
+            outcome.onSuccess {
+                onImported(it.timetableId, it.timetableName, overwrite)
+            }.onFailure {
+                importing = false
+                error = it.message ?: "导入失败"
+            }
+        }
+    }
+
     BackHandler(enabled = parsed != null) { parsed = null }
     BackHandler(enabled = parsed == null) {
         if (webView.canGoBack()) webView.goBack() else onCancel()
@@ -324,42 +367,10 @@ fun EduImportScreen(
                             onOverwriteChange = { overwriteCurrent = it },
                             onBack = { parsed = null },
                             onImport = {
-                                if (importing) return@ParsePreview
-                                importing = true
-                                scope.launch {
-                                    val outcome = runCatching {
-                                        val overwrite = overwriteCurrent &&
-                                            currentTimetableId > 0
-                                        if (!overwrite && termId <= 0) {
-                                            throw IllegalStateException("没有有效学期")
-                                        }
-                                        withContext(Dispatchers.IO) {
-                                            if (overwrite) {
-                                                repository.importParsedTimetableInto(
-                                                    timetableId = currentTimetableId,
-                                                    parsed = result.timetable,
-                                                )
-                                            } else {
-                                                repository.importParsedTimetable(
-                                                    termId = termId,
-                                                    sourceTimetableId = currentTimetableId
-                                                        .takeIf { it > 0 },
-                                                    parsed = result.timetable,
-                                                )
-                                            }
-                                        }
-                                    }
-                                    outcome.onSuccess {
-                                        onImported(
-                                            it.timetableId,
-                                            it.timetableName,
-                                            overwriteCurrent && currentTimetableId > 0,
-                                        )
-                                    }
-                                        .onFailure {
-                                            importing = false
-                                            error = it.message ?: "导入失败"
-                                        }
+                                if (overwriteCurrent && currentTimetableId > 0) {
+                                    pendingOverwriteConfirm = true
+                                } else {
+                                    startImport(result)
                                 }
                             },
                         )
@@ -385,6 +396,30 @@ fun EduImportScreen(
             text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = { error = null }) { Text("好") }
+            },
+        )
+    }
+
+    if (pendingOverwriteConfirm) {
+        AlertDialog(
+            onDismissRequest = { pendingOverwriteConfirm = false },
+            title = { Text("覆盖当前课表？") },
+            text = {
+                Text(
+                    "将清空「${currentTimetableName ?: "当前课表"}」的现有课程，" +
+                        "并写入本次导入的课程。此操作无法撤销，上课时间设置会保留。",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingOverwriteConfirm = false
+                        parsed?.let { startImport(it) }
+                    },
+                ) { Text("覆盖导入") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingOverwriteConfirm = false }) { Text("取消") }
             },
         )
     }

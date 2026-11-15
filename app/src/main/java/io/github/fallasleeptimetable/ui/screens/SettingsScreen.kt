@@ -841,7 +841,6 @@ fun SettingsScreen(
         val target = state.timetables.firstOrNull { it.id == timeTargetId }
         if (term != null && target != null) {
             ClassTimeSettingsDialog(
-                term = term,
                 timetableName = target.name,
                 slots = timeTargetSlots,
                 onDismiss = { showClassTimeDialog = false },

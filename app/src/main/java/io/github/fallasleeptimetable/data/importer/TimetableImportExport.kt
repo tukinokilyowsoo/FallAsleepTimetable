@@ -53,6 +53,9 @@ data class ImportedCourse(
     val sessions: List<ImportedSession>,
 )
 
+private const val MAX_PERIODS = 30
+private const val MAX_WEEKS = 60
+
 data class ImportedSession(
     val dayOfWeek: Int,
     val startPeriod: Int,
@@ -166,13 +169,18 @@ object TimetableImporter {
             val sessionArray = courseJson.optJSONArray("sessions") ?: JSONArray()
             for (sessionIndex in 0 until sessionArray.length()) {
                 val json = sessionArray.optJSONObject(sessionIndex) ?: continue
+                val startPeriod = json.optInt("startPeriod", 1)
+                    .coerceIn(1, MAX_PERIODS)
+                val startWeek = json.optInt("startWeek", 1).coerceIn(1, MAX_WEEKS)
                 sessions.add(
                     ImportedSession(
                         dayOfWeek = json.optInt("dayOfWeek", 1).coerceIn(1, 7),
-                        startPeriod = json.optInt("startPeriod", 1).coerceAtLeast(1),
-                        periodCount = json.optInt("periodCount", 1).coerceAtLeast(1),
-                        startWeek = json.optInt("startWeek", 1).coerceAtLeast(1),
-                        endWeek = json.optInt("endWeek", 20).coerceAtLeast(1),
+                        startPeriod = startPeriod,
+                        periodCount = json.optInt("periodCount", 1)
+                            .coerceIn(1, MAX_PERIODS - startPeriod + 1),
+                        startWeek = startWeek,
+                        endWeek = json.optInt("endWeek", 20)
+                            .coerceIn(startWeek, MAX_WEEKS),
                         parity = json.optInt("parity", 0).coerceIn(0, 2),
                         room = json.optString("room").takeIf { it.isNotBlank() },
                     ),
@@ -274,12 +282,16 @@ object TimetableImporter {
             if (courseDetails.isEmpty()) continue
 
             val sessions = courseDetails.map { detail ->
-                val startWeek = detail.optInt("startWeek", 1).coerceAtLeast(1)
-                val endWeek = detail.optInt("endWeek", 20).coerceAtLeast(startWeek)
+                val startWeek = detail.optInt("startWeek", 1).coerceIn(1, MAX_WEEKS)
+                val endWeek = detail.optInt("endWeek", 20)
+                    .coerceIn(startWeek, MAX_WEEKS)
+                val startPeriod = detail.optInt("startNode", 1)
+                    .coerceIn(1, MAX_PERIODS)
                 ImportedSession(
                     dayOfWeek = detail.optInt("day", 1).coerceIn(1, 7),
-                    startPeriod = detail.optInt("startNode", 1).coerceAtLeast(1),
-                    periodCount = detail.optInt("step", 1).coerceIn(1, 20),
+                    startPeriod = startPeriod,
+                    periodCount = detail.optInt("step", 1)
+                        .coerceIn(1, MAX_PERIODS - startPeriod + 1),
                     startWeek = startWeek,
                     endWeek = endWeek,
                     parity = detail.optInt("type", 0).coerceIn(0, 2),

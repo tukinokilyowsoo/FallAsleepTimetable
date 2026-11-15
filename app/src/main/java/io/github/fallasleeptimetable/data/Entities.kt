@@ -12,6 +12,10 @@ data class TermEntity(
     val name: String,
     val startDateEpochDay: Long,
     val totalWeeks: Int = 20,
+    /**
+     * 仅用于 v1 数据迁移；v2 起每天节数以每张课表的
+     * [TimetableEntity.periodsPerDay] 为准，不要在新代码里读取此字段。
+     */
     val periodsPerDay: Int = 12,
     val showSaturday: Boolean = true,
     val showSunday: Boolean = false,

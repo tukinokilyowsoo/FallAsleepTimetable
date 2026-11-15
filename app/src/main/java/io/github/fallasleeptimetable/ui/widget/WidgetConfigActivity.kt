@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import io.github.fallasleeptimetable.data.AppDatabase
 import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.ui.theme.FallAsleepTheme
+import io.github.fallasleeptimetable.ui.theme.ThemeMode
 import io.github.fallasleeptimetable.widget.WidgetConfig
 import io.github.fallasleeptimetable.widget.WidgetConfigStore
 import io.github.fallasleeptimetable.widget.WidgetUpdater
@@ -63,7 +64,9 @@ open class WidgetConfigActivity : ComponentActivity() {
             AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID,
         )
-        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID ||
+            AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId) == null
+        ) {
             finish()
             return
         }
@@ -76,6 +79,7 @@ open class WidgetConfigActivity : ComponentActivity() {
 
         setContent {
             FallAsleepTheme(
+                darkTheme = ThemeMode.isDark(this@WidgetConfigActivity),
                 dynamicColor = dynamicColor,
                 customSeed = customColor.takeIf { it != 0L }?.let { Color(it) },
             ) {

@@ -6,7 +6,7 @@
 
 于是乎就有了这个完全离线、超轻量、无广告、完全免费、长期维护的 Material You 课程表！
 
-> 当前版本：**v1.1.0 正式版** · Android 8.0+ · arm64-v8a
+> 当前测试版：**v1.1.1-beta1** · 稳定版：v1.1.0 · Android 8.0+ · arm64-v8a
 
 ## Tomo 推荐使用 FallAsleep 课程表！
 
@@ -78,6 +78,12 @@
 - 大小：约 11 MB
 - SHA-256：`d100826ca05a46f51ceca6e6ff21af0c9dc0427d44499e2ede6c32c8de3f8ccd`
 
+测试版在 Releases 中标记为 Pre-release：
+
+- 版本：`v1.1.1-beta1`
+- 文件：`FallAsleepTimetable_arm64_v1.1.1-beta1.apk`
+- SHA-256：`bc43fd7f4845bdb690985ae641e6aeb9d23a126b9d0fb5ed93f5e9b2ccf570eb`
+
 在设置 → 关于 →「检查更新」中可加入 Beta 计划，接收后续测试版。
 
 说明：
@@ -102,6 +108,7 @@
 
 - 无账号、无后端、无统计 SDK。
 - 教务登录只在应用内 WebView 会话中进行，不保存学号密码。
+- 部分学校教务站点仅提供 http，导入 WebView 需要允许明文连接；课表、设置与更新检查不使用明文传输。
 - 详细说明见 [PRIVACY.md](PRIVACY.md)。
 
 ## 技术栈

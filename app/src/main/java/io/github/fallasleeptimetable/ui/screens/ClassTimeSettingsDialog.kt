@@ -40,7 +40,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import io.github.fallasleeptimetable.data.TermEntity
 import io.github.fallasleeptimetable.data.TimeSlotEntity
 import io.github.fallasleeptimetable.ui.formatMinutes
 
@@ -52,7 +51,6 @@ private data class TimePickRequest(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClassTimeSettingsDialog(
-    term: TermEntity,
     timetableName: String,
     slots: List<TimeSlotEntity>,
     onDismiss: () -> Unit,

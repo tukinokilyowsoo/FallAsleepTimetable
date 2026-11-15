@@ -68,7 +68,10 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.fallasleeptimetable.BuildConfig
 import io.github.fallasleeptimetable.R
@@ -234,19 +237,29 @@ fun FallAsleepApp(
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (!settingsPrefs.getBoolean("update_reminders", true)) return@LaunchedEffect
-        val now = System.currentTimeMillis()
-        val lastCheck = settingsPrefs.getLong("update_last_check_at", 0L)
-        if (now - lastCheck < AUTO_UPDATE_CHECK_INTERVAL_MS) return@LaunchedEffect
-        settingsPrefs.edit().putLong("update_last_check_at", now).apply()
-        val source = UpdateSource.fromKey(settingsPrefs.getString("update_source", null))
-        val includePrerelease = settingsPrefs.getBoolean("beta_plan", false)
-        val result = runCatching {
-            UpdateChecker.check(source, BuildConfig.VERSION_NAME, includePrerelease)
-        }.getOrNull()
-        if (result is UpdateCheckResult.Available) {
-            updateSnackbar = result.info
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner, settingsPrefs) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            if (!settingsPrefs.getBoolean("update_reminders", true)) {
+                return@repeatOnLifecycle
+            }
+            val now = System.currentTimeMillis()
+            val lastCheck = settingsPrefs.getLong("update_last_check_at", 0L)
+            if (now - lastCheck < AUTO_UPDATE_CHECK_INTERVAL_MS) {
+                return@repeatOnLifecycle
+            }
+            val source = UpdateSource.fromKey(settingsPrefs.getString("update_source", null))
+            val includePrerelease = settingsPrefs.getBoolean("beta_plan", false)
+            val result = runCatching {
+                UpdateChecker.check(source, BuildConfig.VERSION_NAME, includePrerelease)
+            }.getOrNull() ?: return@repeatOnLifecycle
+            // 只有检查成功才记录时间，离线失败不会压住接下来 6 小时的重试。
+            settingsPrefs.edit()
+                .putLong("update_last_check_at", System.currentTimeMillis())
+                .apply()
+            if (result is UpdateCheckResult.Available) {
+                updateSnackbar = result.info
+            }
         }
     }
 
