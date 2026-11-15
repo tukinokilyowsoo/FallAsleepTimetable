@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -14,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import io.github.fallasleeptimetable.ui.FallAsleepApp
 import io.github.fallasleeptimetable.ui.screens.WelcomeScreen
 import io.github.fallasleeptimetable.ui.theme.FallAsleepTheme
+import io.github.fallasleeptimetable.ui.theme.ThemeMode
 import io.github.fallasleeptimetable.widget.WidgetUpdater
 
 class MainActivity : ComponentActivity() {
@@ -47,8 +49,17 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(!prefs.getBoolean("welcome_seen", false))
             }
             var openEduImportAfterWelcome by rememberSaveable { mutableStateOf(false) }
+            var darkMode by rememberSaveable {
+                mutableStateOf(ThemeMode.get(this@MainActivity))
+            }
+            val darkTheme = when (darkMode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                else -> isSystemInDarkTheme()
+            }
 
             FallAsleepTheme(
+                darkTheme = darkTheme,
                 dynamicColor = dynamicColor,
                 customSeed = customColorArgb.takeIf { it != 0L }?.let { Color(it) },
             ) {
@@ -80,6 +91,12 @@ class MainActivity : ComponentActivity() {
                     onHideStatusBarChange = { enabled ->
                         hideStatusBar = enabled
                         prefs.edit().putBoolean("hide_status_bar", enabled).apply()
+                    },
+                    darkMode = darkMode,
+                    onDarkModeChange = { mode ->
+                        darkMode = mode
+                        ThemeMode.set(this@MainActivity, mode)
+                        WidgetUpdater.updateAll(this@MainActivity)
                     },
                     onShowWelcome = {
                         prefs.edit().putBoolean("welcome_seen", false).apply()

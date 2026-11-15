@@ -33,7 +33,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -49,6 +48,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -81,9 +81,8 @@ import io.github.fallasleeptimetable.data.calendar.CalendarScheduleExporter
 import io.github.fallasleeptimetable.data.diagnostics.ImportLog
 import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.ui.ScheduleUiState
+import io.github.fallasleeptimetable.ui.theme.ThemeMode
 import io.github.fallasleeptimetable.widget.WidgetRefreshScheduler
-import io.github.fallasleeptimetable.widget.WidgetThemeSetting
-import io.github.fallasleeptimetable.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -102,6 +101,8 @@ fun SettingsScreen(
     onCustomColorPicked: (Long) -> Unit,
     hideStatusBar: Boolean,
     onHideStatusBarChange: (Boolean) -> Unit,
+    darkMode: String,
+    onDarkModeChange: (String) -> Unit,
     onShowWelcome: () -> Unit,
     onUpdateTerm: (TermEntity) -> Unit,
     onUpdateTimeSlots: (Long, Int, List<Pair<Int, Int>>, Boolean) -> Unit,
@@ -120,7 +121,7 @@ fun SettingsScreen(
     var timeTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var timeTargetSlots by remember { mutableStateOf<List<TimeSlotEntity>>(emptyList()) }
     var showThemeColorDialog by remember { mutableStateOf(false) }
-    var widgetThemeMenuOpen by remember { mutableStateOf(false) }
+    var showDarkModeDialog by remember { mutableStateOf(false) }
     var termMenuOpen by remember { mutableStateOf(false) }
     var showCreateTimetable by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<TimetableEntity?>(null) }
@@ -146,12 +147,6 @@ fun SettingsScreen(
     }
     var updateReminders by remember {
         mutableStateOf(settingsPrefs.getBoolean("update_reminders", true))
-    }
-    var widgetTheme by remember { mutableStateOf(WidgetThemeSetting.get(context)) }
-    fun applyWidgetTheme(value: String) {
-        WidgetThemeSetting.set(context, value)
-        widgetTheme = value
-        WidgetUpdater.updateAll(context)
     }
 
     fun runCalendarExport() {
@@ -353,6 +348,24 @@ fun SettingsScreen(
             }
             item {
                 ListItem(
+                    headlineContent = { Text("深色模式") },
+                    supportingContent = { Text(ThemeMode.label(darkMode)) },
+                    leadingContent = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_palette),
+                            contentDescription = null,
+                        )
+                    },
+                    trailingContent = {
+                        TextButton(onClick = { showDarkModeDialog = true }) {
+                            Text("设置")
+                        }
+                    },
+                    modifier = Modifier.clickable { showDarkModeDialog = true },
+                )
+            }
+            item {
+                ListItem(
                     headlineContent = { Text("自定义主题色") },
                     supportingContent = {
                         Text(
@@ -406,53 +419,6 @@ fun SettingsScreen(
             item { HorizontalDivider() }
 
             item { SectionHeader("小组件") }
-            item {
-                ListItem(
-                    headlineContent = { Text("小组件样式") },
-                    supportingContent = {
-                        Text("当前：${WidgetThemeSetting.label(widgetTheme)}")
-                    },
-                    leadingContent = {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_palette),
-                            contentDescription = null,
-                        )
-                    },
-                    trailingContent = {
-                        Box {
-                            TextButton(onClick = { widgetThemeMenuOpen = true }) {
-                                Text("设置")
-                            }
-                            DropdownMenu(
-                                expanded = widgetThemeMenuOpen,
-                                onDismissRequest = { widgetThemeMenuOpen = false },
-                            ) {
-                                listOf(
-                                    WidgetThemeSetting.SYSTEM to "跟随系统",
-                                    WidgetThemeSetting.LIGHT to "浅色",
-                                    WidgetThemeSetting.DARK to "深色",
-                                ).forEach { (value, label) ->
-                                    DropdownMenuItem(
-                                        text = { Text(label) },
-                                        leadingIcon = {
-                                            if (widgetTheme == value) {
-                                                Icon(
-                                                    Icons.Filled.Check,
-                                                    contentDescription = null,
-                                                )
-                                            }
-                                        },
-                                        onClick = {
-                                            widgetThemeMenuOpen = false
-                                            applyWidgetTheme(value)
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    },
-                )
-            }
             item {
                 val exactAllowed = WidgetRefreshScheduler.canScheduleExact(context)
                 ListItem(
@@ -775,6 +741,45 @@ fun SettingsScreen(
             onSave = { updated ->
                 onUpdateTerm(updated)
                 showTermDialog = false
+            },
+        )
+    }
+
+    if (showDarkModeDialog) {
+        AlertDialog(
+            onDismissRequest = { showDarkModeDialog = false },
+            title = { Text("深色模式") },
+            text = {
+                Column {
+                    listOf(
+                        ThemeMode.SYSTEM to "跟随系统",
+                        ThemeMode.LIGHT to "浅色",
+                        ThemeMode.DARK to "深色",
+                    ).forEach { (value, label) ->
+                        ListItem(
+                            headlineContent = { Text(label) },
+                            leadingContent = {
+                                RadioButton(
+                                    selected = darkMode == value,
+                                    onClick = {
+                                        onDarkModeChange(value)
+                                        showDarkModeDialog = false
+                                    },
+                                )
+                            },
+                            colors = ListItemDefaults.colors(
+                                containerColor = Color.Transparent,
+                            ),
+                            modifier = Modifier.clickable {
+                                onDarkModeChange(value)
+                                showDarkModeDialog = false
+                            },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDarkModeDialog = false }) { Text("关闭") }
             },
         )
     }

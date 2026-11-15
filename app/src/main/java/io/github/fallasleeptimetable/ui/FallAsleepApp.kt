@@ -108,6 +108,8 @@ fun FallAsleepApp(
     onCustomColorPicked: (Long) -> Unit,
     hideStatusBar: Boolean,
     onHideStatusBarChange: (Boolean) -> Unit,
+    darkMode: String,
+    onDarkModeChange: (String) -> Unit,
     onShowWelcome: () -> Unit,
     startEduImport: Boolean,
     onStartEduImportHandled: () -> Unit,
@@ -315,6 +317,8 @@ fun FallAsleepApp(
                         onConsumeMessage = scheduleViewModel::consumeMessage,
                         hideStatusBar = hideStatusBar,
                         onHideStatusBarChange = onHideStatusBarChange,
+                        darkMode = darkMode,
+                        onDarkModeChange = onDarkModeChange,
                         onShowWelcome = onShowWelcome,
                         onShareClick = { showShareSheet = true },
                         drawScheduleUnderlay = drawScheduleUnderlay,
@@ -337,28 +341,28 @@ fun FallAsleepApp(
         } else {
             Row(modifier = Modifier.fillMaxSize()) {
                 if (!fullscreen) {
-                Surface(
-                    modifier = Modifier
-                        .width(80.dp)
-                        .fillMaxHeight(),
-                    color = MaterialTheme.colorScheme.surface,
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxHeight(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    Surface(
+                        modifier = Modifier
+                            .width(80.dp)
+                            .fillMaxHeight(),
+                        color = MaterialTheme.colorScheme.surface,
                     ) {
-                        Spacer(modifier = Modifier.weight(1f))
-                        AppDestination.entries.forEach { item ->
-                            NavigationRailItem(
-                                selected = destination == item,
-                                onClick = { destination = item },
-                                icon = { Icon(item.icon, contentDescription = null) },
-                                label = { Text(stringResource(item.labelRes)) },
-                            )
+                        Column(
+                            modifier = Modifier.fillMaxHeight(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Spacer(modifier = Modifier.weight(1f))
+                            AppDestination.entries.forEach { item ->
+                                NavigationRailItem(
+                                    selected = destination == item,
+                                    onClick = { destination = item },
+                                    icon = { Icon(item.icon, contentDescription = null) },
+                                    label = { Text(stringResource(item.labelRes)) },
+                                )
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
                         }
-                        Spacer(modifier = Modifier.weight(1f))
                     }
-                }
                 }
 
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -378,6 +382,8 @@ fun FallAsleepApp(
                         onConsumeMessage = scheduleViewModel::consumeMessage,
                         hideStatusBar = hideStatusBar,
                         onHideStatusBarChange = onHideStatusBarChange,
+                        darkMode = darkMode,
+                        onDarkModeChange = onDarkModeChange,
                         onShowWelcome = onShowWelcome,
                         onShareClick = { showShareSheet = true },
                         drawScheduleUnderlay = drawScheduleUnderlay,
@@ -663,6 +669,8 @@ private fun AppContent(
     onConsumeMessage: () -> Unit,
     hideStatusBar: Boolean,
     onHideStatusBarChange: (Boolean) -> Unit,
+    darkMode: String,
+    onDarkModeChange: (String) -> Unit,
     onShowWelcome: () -> Unit,
     onShareClick: () -> Unit,
     drawScheduleUnderlay: Boolean,
@@ -732,6 +740,8 @@ private fun AppContent(
                             onCustomColorPicked = onCustomColorPicked,
                             hideStatusBar = hideStatusBar,
                             onHideStatusBarChange = onHideStatusBarChange,
+                            darkMode = darkMode,
+                            onDarkModeChange = onDarkModeChange,
                             onShowWelcome = onShowWelcome,
                             onUpdateTerm = viewModel::updateTerm,
                             onUpdateTimeSlots = viewModel::updateTimeSlots,

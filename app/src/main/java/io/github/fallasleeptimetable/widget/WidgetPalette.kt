@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import androidx.compose.ui.graphics.Color
+import io.github.fallasleeptimetable.ui.theme.ThemeMode
 
 data class WidgetPalette(
     val background: Color,
@@ -17,41 +18,8 @@ data class WidgetPalette(
     val mutedText: Color,
 )
 
-object WidgetThemeSetting {
-    const val SYSTEM = "system"
-    const val LIGHT = "light"
-    const val DARK = "dark"
-
-    private const val PREFS = "settings"
-    private const val KEY = "widget_theme"
-
-    fun get(context: Context): String =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY, SYSTEM) ?: SYSTEM
-
-    fun set(context: Context, value: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY, value)
-            .commit()
-    }
-
-    fun isDark(context: Context): Boolean = when (get(context)) {
-        DARK -> true
-        LIGHT -> false
-        else -> (context.resources.configuration.uiMode and
-            Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-    }
-
-    fun label(value: String): String = when (value) {
-        DARK -> "深色"
-        LIGHT -> "浅色"
-        else -> "跟随系统"
-    }
-}
-
 fun widgetPalette(context: Context): WidgetPalette {
-    val dark = WidgetThemeSetting.isDark(context)
+    val dark = ThemeMode.isDark(context)
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         monetPalette(context, dark)
     } else {

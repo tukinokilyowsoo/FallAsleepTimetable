@@ -6,7 +6,7 @@
 
 于是乎就有了这个完全离线、超轻量、无广告、完全免费、长期维护的 Material You 课程表！
 
-> 当前测试版：**v1.1.0-beta4** · 稳定版：v1.0.0 · Android 8.0+ · arm64-v8a
+> 当前版本：**v1.1.0 正式版** · Android 8.0+ · arm64-v8a
 
 ## Tomo 推荐使用 FallAsleep 课程表！
 
@@ -67,22 +67,18 @@
 ### 其他
 
 - 检查更新：默认 GitHub 源，提供国内镜像（gh-proxy 加速 API 与 APK 下载）；有可用版本时在主页弹出提醒，可拒收 / 恢复更新提醒，也可加入 Beta 计划接收测试版。
-- 深色模式、自定义主题色、字体缩放、TalkBack 课程描述。
+- 深色模式（跟随系统 / 浅色 / 深色，小组件同步）、自定义主题色、字体缩放、TalkBack 课程描述。
 
 ## 下载与安装
 
 正式版发布于 [Releases](https://github.com/tukinokilyowsoo/FallAsleepTimetable/releases/latest)：
 
-- 文件：`FallAsleepTimetable_arm64_v1.0.0.apk`
+- 文件：`FallAsleepTimetable_arm64_v1.1.0.apk`
 - 架构：arm64-v8a（绝大多数近年的手机与平板）
 - 大小：约 11 MB
-- SHA-256：`09a0c4a300bb8fa45166ba6a4266ec536f647dc7c97e3fdcf062164ad6b566bd`
+- SHA-256：`d100826ca05a46f51ceca6e6ff21af0c9dc0427d44499e2ede6c32c8de3f8ccd`
 
-测试版在 Releases 中标记为 Pre-release：
-
-- 版本：`v1.1.0-beta4`
-- 文件：`FallAsleepTimetable_arm64_v1.1.0-beta4.apk`
-- SHA-256：`fcd8d07039b2513ec290c9c35d1e550f24b08d7c1db8a919a96fd63f56d1267a`
+在设置 → 关于 →「检查更新」中可加入 Beta 计划，接收后续测试版。
 
 说明：
 
@@ -132,6 +128,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 ## 开发与文档
 
 - [M0 记录](docs/M0-记录.md) / [M1 记录](docs/M1-记录.md) / [M2 记录](docs/M2-记录.md) / [M3 记录](docs/M3-记录.md)
+- [v1.1.0 正式版说明](docs/RELEASE-NOTES-v1.1.0.md)
 - [v1.0.0 正式版说明](docs/RELEASE-NOTES-v1.0.0.md)
 - [第三方依赖声明](THIRD-PARTY-NOTICES.md)
 - [隐私政策](PRIVACY.md)
