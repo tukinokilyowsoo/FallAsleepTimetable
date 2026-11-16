@@ -48,7 +48,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -121,7 +120,7 @@ fun SettingsScreen(
     var timeTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var timeTargetSlots by remember { mutableStateOf<List<TimeSlotEntity>>(emptyList()) }
     var showThemeColorDialog by remember { mutableStateOf(false) }
-    var showDarkModeDialog by remember { mutableStateOf(false) }
+    var darkModeMenuOpen by remember { mutableStateOf(false) }
     var termMenuOpen by remember { mutableStateOf(false) }
     var showCreateTimetable by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<TimetableEntity?>(null) }
@@ -357,11 +356,30 @@ fun SettingsScreen(
                         )
                     },
                     trailingContent = {
-                        TextButton(onClick = { showDarkModeDialog = true }) {
-                            Text("设置")
+                        Box {
+                            TextButton(onClick = { darkModeMenuOpen = true }) {
+                                Text("设置")
+                            }
+                            DropdownMenu(
+                                expanded = darkModeMenuOpen,
+                                onDismissRequest = { darkModeMenuOpen = false },
+                            ) {
+                                listOf(
+                                    ThemeMode.SYSTEM to "跟随系统",
+                                    ThemeMode.LIGHT to "浅色",
+                                    ThemeMode.DARK to "深色",
+                                ).forEach { (value, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = {
+                                            darkModeMenuOpen = false
+                                            onDarkModeChange(value)
+                                        },
+                                    )
+                                }
+                            }
                         }
                     },
-                    modifier = Modifier.clickable { showDarkModeDialog = true },
                 )
             }
             item {
@@ -741,45 +759,6 @@ fun SettingsScreen(
             onSave = { updated ->
                 onUpdateTerm(updated)
                 showTermDialog = false
-            },
-        )
-    }
-
-    if (showDarkModeDialog) {
-        AlertDialog(
-            onDismissRequest = { showDarkModeDialog = false },
-            title = { Text("深色模式") },
-            text = {
-                Column {
-                    listOf(
-                        ThemeMode.SYSTEM to "跟随系统",
-                        ThemeMode.LIGHT to "浅色",
-                        ThemeMode.DARK to "深色",
-                    ).forEach { (value, label) ->
-                        ListItem(
-                            headlineContent = { Text(label) },
-                            leadingContent = {
-                                RadioButton(
-                                    selected = darkMode == value,
-                                    onClick = {
-                                        onDarkModeChange(value)
-                                        showDarkModeDialog = false
-                                    },
-                                )
-                            },
-                            colors = ListItemDefaults.colors(
-                                containerColor = Color.Transparent,
-                            ),
-                            modifier = Modifier.clickable {
-                                onDarkModeChange(value)
-                                showDarkModeDialog = false
-                            },
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showDarkModeDialog = false }) { Text("关闭") }
             },
         )
     }
