@@ -1,4 +1,18 @@
-# FallAsleep 课程表
+<div align="center">
+  <img src="docs/logo.png" width="220" alt="FallAsleep 课程表" />
+</div>
+
+<h1 align="center">FallAsleep 课程表</h1>
+
+<p align="center">
+  离线、无广告、完全免费的 Material You 课程表。
+</p>
+
+<p align="center">
+  <b>简体中文</b> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a>
+</p>
+
+---
 
 ## Tomo 受够了走在路上看课表结果跳转各种APP的生活！！！
 
