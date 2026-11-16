@@ -9,7 +9,10 @@
 </p>
 
 <p align="center">
-  <b>简体中文</b> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a>
+  🌐&nbsp;
+  <a href="README.md"><kbd>🇨🇳 简体中文 ✓</kbd></a>&nbsp;
+  <a href="README.en.md"><kbd>🇬🇧 English</kbd></a>&nbsp;
+  <a href="README.ja.md"><kbd>🇯🇵 日本語</kbd></a>
 </p>
 
 ---
