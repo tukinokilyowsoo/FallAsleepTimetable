@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "FallAsleep 课程表主模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "FallAsleep 课程表"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "FallAsleep 课程表"
+    }
+  ]
+}

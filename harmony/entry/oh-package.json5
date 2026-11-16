@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "FallAsleep 课程表主模块",
+  "main": "",
+  "author": "Lyowsoo",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "dependencies": {}
+}

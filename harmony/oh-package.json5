@@ -1,0 +1,8 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "fallasleep-timetable-harmony",
+  "version": "1.0.0",
+  "description": "FallAsleep 课程表 HarmonyOS 原生版",
+  "dependencies": {},
+  "devDependencies": {}
+}
