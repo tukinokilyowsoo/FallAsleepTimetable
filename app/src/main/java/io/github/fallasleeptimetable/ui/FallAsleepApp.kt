@@ -239,6 +239,8 @@ fun FallAsleepApp(
 
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner, settingsPrefs) {
+        // 华为渠道由应用市场负责更新，不做 GitHub 自更新检查。
+        if (BuildConfig.HUAWEI_CHANNEL) return@LaunchedEffect
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             if (!settingsPrefs.getBoolean("update_reminders", true)) {
                 return@repeatOnLifecycle

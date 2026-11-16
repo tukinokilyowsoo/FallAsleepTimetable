@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -690,33 +691,45 @@ fun SettingsScreen(
                     supportingContent = { Text("版本 ${BuildConfig.VERSION_NAME}") },
                     leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
                     trailingContent = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (BuildConfig.HUAWEI_CHANNEL) {
                             TextButton(
-                                onClick = {
-                                    updateReminders = !updateReminders
-                                    settingsPrefs.edit()
-                                        .putBoolean("update_reminders", updateReminders)
-                                        .apply()
-                                },
-                                contentPadding = PaddingValues(horizontal = 8.dp),
-                            ) {
-                                Text(
-                                    text = if (updateReminders) {
-                                        "拒收更新提醒"
-                                    } else {
-                                        "接收更新提醒"
-                                    },
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
-                            }
-                            TextButton(
-                                onClick = { showUpdateDialog = true },
+                                onClick = { openAppGallery(context) },
                                 contentPadding = PaddingValues(horizontal = 8.dp),
                             ) {
                                 Text(
                                     text = "检查更新",
                                     style = MaterialTheme.typography.labelMedium,
                                 )
+                            }
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(
+                                    onClick = {
+                                        updateReminders = !updateReminders
+                                        settingsPrefs.edit()
+                                            .putBoolean("update_reminders", updateReminders)
+                                            .apply()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp),
+                                ) {
+                                    Text(
+                                        text = if (updateReminders) {
+                                            "拒收更新提醒"
+                                        } else {
+                                            "接收更新提醒"
+                                        },
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
+                                TextButton(
+                                    onClick = { showUpdateDialog = true },
+                                    contentPadding = PaddingValues(horizontal = 8.dp),
+                                ) {
+                                    Text(
+                                        text = "检查更新",
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
                             }
                         }
                     },
@@ -1164,6 +1177,21 @@ private fun parseHexColor(input: String): Long? {
     if (cleaned.length != 6) return null
     val value = cleaned.toLongOrNull(16) ?: return null
     return 0xFF000000L or value
+}
+
+private fun openAppGallery(context: Context) {
+    val intent = Intent(
+        Intent.ACTION_VIEW,
+        Uri.parse("market://details?id=${context.packageName}"),
+    ).setPackage("com.huawei.appmarket")
+    val launched = runCatching { context.startActivity(intent) }.isSuccess
+    if (!launched) {
+        Toast.makeText(
+            context,
+            "请打开华为应用市场搜索 FallAsleep 课程表",
+            Toast.LENGTH_LONG,
+        ).show()
+    }
 }
 
 @Composable

@@ -7,6 +7,8 @@
 于是乎就有了这个完全离线、超轻量、无广告、完全免费、长期维护的 Material You 课程表！
 
 > 当前测试版：**v1.1.1-beta1** · 稳定版：v1.1.0 · Android 8.0+ · arm64-v8a
+>
+> 华为应用市场版：包名 `io.github.tukinokilyowsoo.fallasleeptimetable.huawei`，更新由 AppGallery 负责；构建与上架见 [华为发布说明](docs/HUAWEI-发布.md)。
 
 ## Tomo 推荐使用 FallAsleep 课程表！
 

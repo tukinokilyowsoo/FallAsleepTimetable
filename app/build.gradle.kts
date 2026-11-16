@@ -19,11 +19,13 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.github.tukinokilyowsoo.fallasleeptimetable"
+        applicationId = "io.github.tukinokilyowsoo.fallasleeptimetable.huawei"
         minSdk = 26
         targetSdk = 36
         versionCode = 25
-        versionName = "1.1.1-beta1"
+        versionName = "1.1.1"
+
+        buildConfigField("boolean", "HUAWEI_CHANNEL", "true")
 
         ndk {
             abiFilters += listOf("arm64-v8a")
