@@ -64,6 +64,15 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.widget.TimelineWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FallAsleep">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".widget.WidgetRefreshReceiver"
             android:exported="false">
@@ -100,6 +109,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/week_schedule_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.TodayTimelineWidgetReceiver"
+            android:exported="false"
+            android:label="今日时间轴">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_timeline_widget_info" />
         </receiver>
 
     </application>

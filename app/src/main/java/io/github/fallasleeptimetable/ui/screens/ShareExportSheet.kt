@@ -1,6 +1,8 @@
 package io.github.fallasleeptimetable.ui.screens
 
+import android.content.Context
 import android.net.Uri
+import java.io.ByteArrayOutputStream
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -121,8 +123,7 @@ fun ShareExportSheet(
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         val text = runCatching {
-            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                ?: error("无法读取文件")
+            readTextLimited(context, uri)
         }.getOrElse { error ->
             onMessage("读取失败：${error.message ?: "未知错误"}")
             null
@@ -305,5 +306,24 @@ fun ShareExportSheet(
                 }
             },
         )
+    }
+}
+
+private const val MAX_IMPORT_BYTES = 10 * 1024 * 1024
+
+private fun readTextLimited(context: Context, uri: Uri): String {
+    val input = context.contentResolver.openInputStream(uri) ?: error("无法读取文件")
+    return input.use { stream ->
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        var total = 0
+        while (true) {
+            val read = stream.read(buffer)
+            if (read <= 0) break
+            total += read
+            if (total > MAX_IMPORT_BYTES) error("文件太大（上限 10 MB）")
+            output.write(buffer, 0, read)
+        }
+        output.toString(Charsets.UTF_8.name())
     }
 }

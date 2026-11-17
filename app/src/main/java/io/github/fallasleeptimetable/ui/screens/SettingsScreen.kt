@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -98,8 +100,6 @@ fun SettingsScreen(
     onDynamicColorChange: (Boolean) -> Unit,
     customColorArgb: Long?,
     onCustomColorPicked: (Long) -> Unit,
-    hideStatusBar: Boolean,
-    onHideStatusBarChange: (Boolean) -> Unit,
     darkMode: String,
     onDarkModeChange: (String) -> Unit,
     onShowWelcome: () -> Unit,
@@ -321,11 +321,18 @@ fun SettingsScreen(
             WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
         ),
     ) { innerPadding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter,
         ) {
+            LazyColumn(
+                modifier = Modifier
+                    .widthIn(max = 840.dp)
+                    .fillMaxWidth()
+                    .fillMaxHeight(),
+            ) {
             item { SectionHeader("外观") }
             item {
                 ListItem(
@@ -414,24 +421,6 @@ fun SettingsScreen(
                         )
                     },
                     modifier = Modifier.clickable { showThemeColorDialog = true },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("隐藏状态栏") },
-                    supportingContent = { Text("隐藏顶部状态栏，保留底部手势条") },
-                    leadingContent = {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_fullscreen),
-                            contentDescription = null,
-                        )
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = hideStatusBar,
-                            onCheckedChange = onHideStatusBarChange,
-                        )
-                    },
                 )
             }
             item { HorizontalDivider() }
@@ -649,7 +638,9 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("导出日志") },
-                    supportingContent = { Text("反馈教务解析问题用，可能包含课表页内容") },
+                    supportingContent = {
+                        Text("反馈解析问题用；已脱敏密码/token，仍请检查后发送")
+                    },
                     leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
                     modifier = Modifier.clickable {
                         logLauncher.launch("FallAsleep-log.txt")
@@ -749,6 +740,7 @@ fun SettingsScreen(
                 )
             }
             item { Spacer(modifier = Modifier.width(1.dp).padding(bottom = 16.dp)) }
+            }
         }
     }
 
@@ -1171,7 +1163,7 @@ private fun SectionHeader(title: String) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
             text = title,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
     }

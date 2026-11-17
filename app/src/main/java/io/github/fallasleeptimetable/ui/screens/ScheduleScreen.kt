@@ -464,12 +464,11 @@ private fun WeekBoard(
                         contentDescription = if (fullscreen) "退出全屏" else "全屏",
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                FilledTonalIconButton(onClick = onPrevWeek) {
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(onClick = onPrevWeek) {
                     Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "上一周")
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                FilledTonalIconButton(onClick = onNextWeek) {
+                IconButton(onClick = onNextWeek) {
                     Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "下一周")
                 }
             }
@@ -483,7 +482,7 @@ private fun WeekBoard(
                 val verticalState = rememberScrollState()
                 val headerHeight = 44.dp
                 val rowHeight = ((maxHeight - headerHeight) / state.periodsPerDay)
-                    .coerceIn(40.dp, 72.dp)
+                    .coerceIn(48.dp, 72.dp)
                 val availableDayWidth = (maxWidth - timeWidth) / days.size
                 val dayWidth = if (compact) {
                     maxOf(availableDayWidth, 64.dp)

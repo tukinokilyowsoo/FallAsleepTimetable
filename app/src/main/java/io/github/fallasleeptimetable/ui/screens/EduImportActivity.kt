@@ -3,6 +3,8 @@ package io.github.fallasleeptimetable.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.net.Uri
+import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -134,6 +136,23 @@ private const val GRAB_PAGE_JS = """
 })()
 """
 
+private const val MAX_HTML_CHARS = 2_000_000
+
+/** 只允许 http/https，避免 file:、content:、javascript: 等 scheme 进入 WebView。 */
+private fun normalizeWebUrl(input: String): String? {
+    val trimmed = input.trim()
+    if (trimmed.isEmpty()) return null
+    val candidate = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        trimmed
+    } else {
+        "http://$trimmed"
+    }
+    val uri = Uri.parse(candidate)
+    if (uri.scheme != "http" && uri.scheme != "https") return null
+    if (uri.host.isNullOrBlank()) return null
+    return candidate
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EduImportScreen(
@@ -171,17 +190,24 @@ fun EduImportScreen(
             settings.useWideViewPort = true
             settings.builtInZoomControls = true
             settings.displayZoomControls = false
-            settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            settings.setAllowFileAccessFromFileURLs(false)
+            settings.setAllowUniversalAccessFromFileURLs(false)
+            settings.saveFormData = false
             webViewClient = WebViewClient()
-            val initial = url.trim()
-            if (initial.isNotEmpty()) {
-                loadUrl(if (initial.startsWith("http")) initial else "http://$initial")
-            }
+            normalizeWebUrl(url)?.let(::loadUrl)
         }
     }
 
     DisposableEffect(Unit) {
-        onDispose { webView.destroy() }
+        onDispose {
+            // 教务登录只保留在当前会话里，退出导入页时清掉 Cookie。
+            CookieManager.getInstance().removeAllCookies(null)
+            CookieManager.getInstance().flush()
+            webView.destroy()
+        }
     }
 
     fun openUrl() {
@@ -190,10 +216,10 @@ fun EduImportScreen(
             error = "请输入教务网址"
             return
         }
-        val normalized = if (input.startsWith("http://") || input.startsWith("https://")) {
-            input
-        } else {
-            "http://$input"
+        val normalized = normalizeWebUrl(input)
+        if (normalized == null) {
+            error = "请输入有效的 http/https 教务网址"
+            return
         }
         url = normalized
         prefs.edit().putString("edu_url", normalized).apply()
@@ -208,6 +234,11 @@ fun EduImportScreen(
             val html = runCatching {
                 JSONTokener(result ?: "null").nextValue() as? String
             }.getOrNull()
+            if (html != null && html.length > MAX_HTML_CHARS) {
+                loading = false
+                error = "页面内容过大，无法解析"
+                return@evaluateJavascript
+            }
             if (html.isNullOrBlank()) {
                 loading = false
                 error = "没有抓取到页面内容，请等页面加载完成后再试"

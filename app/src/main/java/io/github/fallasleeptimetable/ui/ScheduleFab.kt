@@ -23,15 +23,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import io.github.fallasleeptimetable.R
 
 @Composable
 fun ScheduleFab(
@@ -41,7 +40,6 @@ fun ScheduleFab(
     onEduImport: () -> Unit,
     onSwitchTimetable: () -> Unit,
     onCreateTimetable: () -> Unit,
-    onJumpToCurrentWeek: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -77,19 +75,6 @@ fun ScheduleFab(
                     label = "新建课表",
                     icon = Icons.Filled.Create,
                     onClick = onCreateTimetable,
-                )
-            }
-        }
-
-        if (!expanded) {
-            FloatingActionButton(
-                onClick = onJumpToCurrentWeek,
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_my_location),
-                    contentDescription = "回到本周",
                 )
             }
         }
@@ -133,6 +118,7 @@ private fun SpeedDialItem(
         }
         SmallFloatingActionButton(
             onClick = onClick,
+            modifier = Modifier.minimumInteractiveComponentSize(),
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         ) {

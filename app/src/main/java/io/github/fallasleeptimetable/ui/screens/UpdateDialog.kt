@@ -227,7 +227,9 @@ fun UpdateDialog(
 }
 
 private fun openUrl(context: Context, url: String) {
+    val uri = Uri.parse(url)
+    if (uri.scheme != "http" && uri.scheme != "https") return
     runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
     }
 }

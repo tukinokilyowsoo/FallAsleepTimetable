@@ -23,7 +23,7 @@ Done with splash ads! Done with shake-to-jump! Done with over-designed screens! 
 
 So here it is: a completely offline, featherweight, ad-free, absolutely free, long-term-maintained Material You timetable!
 
-> Current beta: **v1.1.1-beta1** · Stable: v1.1.0 · Android 8.0+ · arm64-v8a
+> Current beta: **v1.2.0-beta1** · Stable: v1.1.0 · Android 8.0+ · arm64-v8a
 
 ## Tomo says: use FallAsleep Timetable!
 
@@ -96,9 +96,9 @@ Stable releases live in [Releases](https://github.com/tukinokilyowsoo/FallAsleep
 
 Betas are marked as Pre-release in Releases:
 
-- Version: `v1.1.1-beta1`
-- File: `FallAsleepTimetable_arm64_v1.1.1-beta1.apk`
-- SHA-256: `bc43fd7f4845bdb690985ae641e6aeb9d23a126b9d0fb5ed93f5e9b2ccf570eb`
+- Version: `v1.2.0-beta1`
+- File: `FallAsleepTimetable_arm64_v1.2.0-beta1.apk`
+- SHA-256: `22b68a2a578dc00817b59de33ca83677a3d3d39c59cfcca78f1911ddc548ccb7`
 
 You can join the Beta plan from Settings → About → Check for updates to receive future betas.
 

@@ -42,9 +42,6 @@ class MainActivity : ComponentActivity() {
             var customColorArgb by rememberSaveable {
                 mutableStateOf(prefs.getLong("custom_color", 0L))
             }
-            var hideStatusBar by rememberSaveable {
-                mutableStateOf(prefs.getBoolean("hide_status_bar", false))
-            }
             var showWelcome by rememberSaveable {
                 mutableStateOf(!prefs.getBoolean("welcome_seen", false))
             }
@@ -86,11 +83,6 @@ class MainActivity : ComponentActivity() {
                             .putLong("custom_color", argb)
                             .putBoolean("dynamic_color", false)
                             .apply()
-                    },
-                    hideStatusBar = hideStatusBar,
-                    onHideStatusBarChange = { enabled ->
-                        hideStatusBar = enabled
-                        prefs.edit().putBoolean("hide_status_bar", enabled).apply()
                     },
                     darkMode = darkMode,
                     onDarkModeChange = { mode ->

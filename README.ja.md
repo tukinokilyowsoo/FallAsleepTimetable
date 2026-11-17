@@ -23,7 +23,7 @@
 
 というわけで、完全オフライン・超軽量・広告なし・完全無料・長期メンテの Material You 時間割ができました！
 
-> 現在のベータ版：**v1.1.1-beta1** · 安定版：v1.1.0 · Android 8.0+ · arm64-v8a
+> 現在のベータ版：**v1.2.0-beta1** · 安定版：v1.1.0 · Android 8.0+ · arm64-v8a
 
 ## Tomo のおすすめは FallAsleep 時間割！
 
@@ -96,9 +96,9 @@
 
 ベータ版は Releases で Pre-release として公開：
 
-- バージョン：`v1.1.1-beta1`
-- ファイル：`FallAsleepTimetable_arm64_v1.1.1-beta1.apk`
-- SHA-256：`bc43fd7f4845bdb690985ae641e6aeb9d23a126b9d0fb5ed93f5e9b2ccf570eb`
+- バージョン：`v1.2.0-beta1`
+- ファイル：`FallAsleepTimetable_arm64_v1.2.0-beta1.apk`
+- SHA-256：`22b68a2a578dc00817b59de33ca83677a3d3d39c59cfcca78f1911ddc548ccb7`
 
 設定 → 概要 →「アップデートを確認」から Beta プランに参加すると、今後のベータ版を受け取れます。
 

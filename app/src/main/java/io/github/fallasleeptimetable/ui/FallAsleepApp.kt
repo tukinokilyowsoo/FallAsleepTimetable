@@ -109,8 +109,6 @@ fun FallAsleepApp(
     onDynamicColorChange: (Boolean) -> Unit,
     customColorArgb: Long?,
     onCustomColorPicked: (Long) -> Unit,
-    hideStatusBar: Boolean,
-    onHideStatusBarChange: (Boolean) -> Unit,
     darkMode: String,
     onDarkModeChange: (String) -> Unit,
     onShowWelcome: () -> Unit,
@@ -190,7 +188,7 @@ fun FallAsleepApp(
     }
 
     val view = LocalView.current
-    DisposableEffect(fullscreen, hideStatusBar) {
+    DisposableEffect(fullscreen) {
         val controller = view.context.findActivity()?.window?.let { window ->
             WindowCompat.getInsetsController(window, view)
         }
@@ -202,12 +200,7 @@ fun FallAsleepApp(
             } else {
                 controller.systemBarsBehavior =
                     WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
-                if (hideStatusBar) {
-                    controller.hide(WindowInsetsCompat.Type.statusBars())
-                } else {
-                    controller.show(WindowInsetsCompat.Type.statusBars())
-                }
-                controller.show(WindowInsetsCompat.Type.navigationBars())
+                controller.show(WindowInsetsCompat.Type.systemBars())
             }
         }
         onDispose { /* 系统栏的真正恢复交给下面的 DisposableEffect(view) */ }
@@ -328,12 +321,11 @@ fun FallAsleepApp(
                         onCreateTimetableRequest = { showCreateTimetable = true },
                         message = message,
                         onConsumeMessage = scheduleViewModel::consumeMessage,
-                        hideStatusBar = hideStatusBar,
-                        onHideStatusBarChange = onHideStatusBarChange,
-                        darkMode = darkMode,
+                                                darkMode = darkMode,
                         onDarkModeChange = onDarkModeChange,
                         onShowWelcome = onShowWelcome,
                         onShareClick = { showShareSheet = true },
+                        onOpenSchedule = { destination = AppDestination.Schedule },
                         drawScheduleUnderlay = drawScheduleUnderlay,
                         backProgress = backProgress,
                     )
@@ -393,12 +385,11 @@ fun FallAsleepApp(
                         onCreateTimetableRequest = { showCreateTimetable = true },
                         message = message,
                         onConsumeMessage = scheduleViewModel::consumeMessage,
-                        hideStatusBar = hideStatusBar,
-                        onHideStatusBarChange = onHideStatusBarChange,
-                        darkMode = darkMode,
+                                                darkMode = darkMode,
                         onDarkModeChange = onDarkModeChange,
                         onShowWelcome = onShowWelcome,
                         onShareClick = { showShareSheet = true },
+                        onOpenSchedule = { destination = AppDestination.Schedule },
                         drawScheduleUnderlay = drawScheduleUnderlay,
                         backProgress = backProgress,
                     )
@@ -453,7 +444,6 @@ fun FallAsleepApp(
                     fabExpanded = false
                     showCreateTimetable = true
                 },
-                onJumpToCurrentWeek = scheduleViewModel::jumpToCurrentWeek,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .navigationBarsPadding()
@@ -680,12 +670,11 @@ private fun AppContent(
     onCreateTimetableRequest: () -> Unit,
     message: String?,
     onConsumeMessage: () -> Unit,
-    hideStatusBar: Boolean,
-    onHideStatusBarChange: (Boolean) -> Unit,
     darkMode: String,
     onDarkModeChange: (String) -> Unit,
     onShowWelcome: () -> Unit,
     onShareClick: () -> Unit,
+    onOpenSchedule: () -> Unit,
     drawScheduleUnderlay: Boolean,
     backProgress: Float,
 ) {
@@ -744,16 +733,17 @@ private fun AppContent(
                 }
                 Box(modifier = overlayModifier) {
                     when (dest) {
-                        AppDestination.Today -> TodayScreen(state = state)
+                        AppDestination.Today -> TodayScreen(
+                            state = state,
+                            onOpenSchedule = onOpenSchedule,
+                        )
                         AppDestination.Settings -> SettingsScreen(
                             state = state,
                             dynamicColor = dynamicColor,
                             onDynamicColorChange = onDynamicColorChange,
                             customColorArgb = customColorArgb,
                             onCustomColorPicked = onCustomColorPicked,
-                            hideStatusBar = hideStatusBar,
-                            onHideStatusBarChange = onHideStatusBarChange,
-                            darkMode = darkMode,
+                                                            darkMode = darkMode,
                             onDarkModeChange = onDarkModeChange,
                             onShowWelcome = onShowWelcome,
                             onUpdateTerm = viewModel::updateTerm,

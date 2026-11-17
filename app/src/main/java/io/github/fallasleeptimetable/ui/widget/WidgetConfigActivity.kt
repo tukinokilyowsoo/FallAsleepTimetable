@@ -1,6 +1,7 @@
 package io.github.fallasleeptimetable.ui.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -44,6 +45,9 @@ import io.github.fallasleeptimetable.data.AppDatabase
 import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.ui.theme.FallAsleepTheme
 import io.github.fallasleeptimetable.ui.theme.ThemeMode
+import io.github.fallasleeptimetable.widget.TodayCoursesWidgetReceiver
+import io.github.fallasleeptimetable.widget.TodayTimelineWidgetReceiver
+import io.github.fallasleeptimetable.widget.WeekScheduleWidgetReceiver
 import io.github.fallasleeptimetable.widget.WidgetConfig
 import io.github.fallasleeptimetable.widget.WidgetConfigStore
 import io.github.fallasleeptimetable.widget.WidgetUpdater
@@ -64,8 +68,16 @@ open class WidgetConfigActivity : ComponentActivity() {
             AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID,
         )
+        val expectedProvider = when (widgetKind) {
+            WIDGET_KIND_WEEK -> WeekScheduleWidgetReceiver::class.java
+            WIDGET_KIND_TIMELINE -> TodayTimelineWidgetReceiver::class.java
+            else -> TodayCoursesWidgetReceiver::class.java
+        }
+        val widgetInfo = AppWidgetManager.getInstance(this)
+            .getAppWidgetInfo(appWidgetId)
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID ||
-            AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId) == null
+            widgetInfo == null ||
+            widgetInfo.provider != ComponentName(this, expectedProvider)
         ) {
             finish()
             return
@@ -122,6 +134,7 @@ open class WidgetConfigActivity : ComponentActivity() {
     companion object {
         const val WIDGET_KIND_TODAY = "today"
         const val WIDGET_KIND_WEEK = "week"
+        const val WIDGET_KIND_TIMELINE = "timeline"
     }
 }
 
@@ -131,6 +144,10 @@ class TodayWidgetConfigActivity : WidgetConfigActivity() {
 
 class WeekWidgetConfigActivity : WidgetConfigActivity() {
     override val widgetKind: String = WidgetConfigActivity.WIDGET_KIND_WEEK
+}
+
+class TimelineWidgetConfigActivity : WidgetConfigActivity() {
+    override val widgetKind: String = WidgetConfigActivity.WIDGET_KIND_TIMELINE
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -143,6 +160,8 @@ private fun WidgetConfigScreen(
     onSave: (WidgetConfig) -> Unit,
 ) {
     val isToday = kind == WidgetConfigActivity.WIDGET_KIND_TODAY
+    val isTimeline = kind == WidgetConfigActivity.WIDGET_KIND_TIMELINE
+    val showsTeacher = isToday || isTimeline
     var timetableId by remember {
         mutableStateOf(
             initial.timetableId?.takeIf { id -> timetables.any { it.id == id } },
@@ -207,24 +226,30 @@ private fun WidgetConfigScreen(
                 item {
                     SwitchRow(
                         label = "显示教室",
-                        description = if (isToday) {
-                            "课程卡片中的地点"
-                        } else {
-                            "周课表课程格中的地点"
+                        description = when {
+                            isTimeline -> "时间轴中的地点"
+                            isToday -> "课程卡片中的地点"
+                            else -> "周课表课程格中的地点"
                         },
                         checked = showRoom,
                         onCheckedChange = { showRoom = it },
                     )
                 }
-                if (isToday) {
+                if (showsTeacher) {
                     item {
                         SwitchRow(
                             label = "显示教师",
-                            description = "课程卡片中的教师",
+                            description = if (isTimeline) {
+                                "时间轴中的教师"
+                            } else {
+                                "课程卡片中的教师"
+                            },
                             checked = showTeacher,
                             onCheckedChange = { showTeacher = it },
                         )
                     }
+                }
+                if (isToday) {
                     item {
                         SwitchRow(
                             label = "显示明天/后天",

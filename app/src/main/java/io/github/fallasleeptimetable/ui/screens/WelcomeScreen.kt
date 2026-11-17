@@ -121,14 +121,14 @@ fun WelcomeScreen(onFinish: (Boolean) -> Unit) {
                     modifier = Modifier.weight(1f),
                     beyondViewportPageCount = 1,
                 ) { page ->
-                    val pageOffset = (
-                        (pagerState.currentPage - page) +
-                            pagerState.currentPageOffsetFraction
-                        )
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
+                                val pageOffset = (
+                                    (pagerState.currentPage - page) +
+                                        pagerState.currentPageOffsetFraction
+                                    )
                                 val progress = abs(pageOffset).coerceIn(0f, 1f)
                                 alpha = 1f - progress * 0.75f
                                 translationX = -pageOffset * size.width * 0.18f
