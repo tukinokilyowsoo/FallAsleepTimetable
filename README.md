@@ -23,7 +23,7 @@
 
 于是乎就有了这个完全离线、超轻量、无广告、完全免费、长期维护的 Material You 课程表！
 
-> 当前版本：**v1.2.0** · Android 8.0+ · arm64-v8a
+> 当前版本：**v1.2.1** · Android 8.0+ · arm64-v8a
 
 ## Tomo 推荐使用 FallAsleep 课程表！
 
@@ -47,6 +47,7 @@
 - **教务导入**：内置 WebView 手动登录，抓取当前课表页后在本地解析。
   - 支持新版正方（jwglxt）、老正方、强智三套模板，自动识别。
   - 可切换电脑版 / 手机版 UA，适配只给电脑端完整课表的教务系统。
+  - 可记住教务账号密码，仅在本机加密保存，下次自动填入登录页。
   - 可选择覆盖当前课表，沿用该表已有的上课时间配置。
 - **文件导入**：JSON 备份、ICS 日历、CSV 表格、旧版 `.wakeup_schedule`。
 - JSON 备份包含学期设置时，可选择一并恢复开学日期、周数和上课时间。
@@ -87,10 +88,10 @@
 
 正式版发布于 [Releases](https://github.com/tukinokilyowsoo/FallAsleepTimetable/releases/latest)：
 
-- 文件：`FallAsleepTimetable_arm64_v1.2.0.apk`
+- 文件：`FallAsleepTimetable_arm64_v1.2.1.apk`
 - 架构：arm64-v8a（绝大多数近年的手机与平板）
 - 大小：约 10.5 MB
-- SHA-256：`e299036edcc100e273158cbc3f4e0dc0dc5b5b34c8d25fa1bdb616e1b2b70858`
+- SHA-256：`dc636c6b510970d78fff39aea331a255a8ad283b36a7c33c40aa6a982f170e28`
 
 后续测试版会标记为 Pre-release；在设置 → 关于 →「检查更新」中可加入 Beta 计划接收。
 
@@ -142,6 +143,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 ## 开发与文档
 
 - [M0 记录](docs/M0-记录.md) / [M1 记录](docs/M1-记录.md) / [M2 记录](docs/M2-记录.md) / [M3 记录](docs/M3-记录.md)
+- [v1.2.1 正式版说明](docs/RELEASE-NOTES-v1.2.1.md)
 - [v1.2.0 正式版说明](docs/RELEASE-NOTES-v1.2.0.md)
 - [v1.1.0 正式版说明](docs/RELEASE-NOTES-v1.1.0.md)
 - [v1.0.0 正式版说明](docs/RELEASE-NOTES-v1.0.0.md)

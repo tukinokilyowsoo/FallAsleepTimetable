@@ -23,7 +23,7 @@ Done with splash ads! Done with shake-to-jump! Done with over-designed screens! 
 
 So here it is: a completely offline, featherweight, ad-free, absolutely free, long-term-maintained Material You timetable!
 
-> Current version: **v1.2.0** · Android 8.0+ · arm64-v8a
+> Current version: **v1.2.1** · Android 8.0+ · arm64-v8a
 
 ## Tomo says: use FallAsleep Timetable!
 
@@ -50,6 +50,7 @@ So here it is: a completely offline, featherweight, ad-free, absolutely free, lo
 - **Academic system import**: a built-in WebView for manual login; grab the timetable page and parse it locally.
   - Supports new Zhengfang (jwglxt), old Zhengfang and Qiangzhi templates, detected automatically.
   - Switch between desktop and mobile user agents for sites that only expose the full timetable to desktop browsers.
+  - Optional "remember password": stored encrypted on-device only and filled into the login page next time.
   - Optionally overwrite the current timetable while keeping its existing class-time setup.
 - **File import**: JSON backup, ICS calendar, CSV spreadsheet and the legacy `.wakeup_schedule`.
 - If a JSON backup carries term settings, you can restore the start date, week count and class times together.
@@ -91,10 +92,10 @@ Settings → Data:
 
 Stable releases live in [Releases](https://github.com/tukinokilyowsoo/FallAsleepTimetable/releases/latest):
 
-- File: `FallAsleepTimetable_arm64_v1.2.0.apk`
+- File: `FallAsleepTimetable_arm64_v1.2.1.apk`
 - Architecture: arm64-v8a (most recent phones and tablets)
 - Size: about 10.5 MB
-- SHA-256: `e299036edcc100e273158cbc3f4e0dc0dc5b5b34c8d25fa1bdb616e1b2b70858`
+- SHA-256: `dc636c6b510970d78fff39aea331a255a8ad283b36a7c33c40aa6a982f170e28`
 
 Future betas are marked as Pre-release; join the Beta plan from Settings → About → Check for updates to receive them.
 
@@ -147,6 +148,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 ## Development & docs
 
 - [M0 notes](docs/M0-记录.md) / [M1 notes](docs/M1-记录.md) / [M2 notes](docs/M2-记录.md) / [M3 notes](docs/M3-记录.md)
+- [v1.2.1 release notes](docs/RELEASE-NOTES-v1.2.1.md)
 - [v1.2.0 release notes](docs/RELEASE-NOTES-v1.2.0.md)
 - [v1.1.0 release notes](docs/RELEASE-NOTES-v1.1.0.md)
 - [v1.0.0 release notes](docs/RELEASE-NOTES-v1.0.0.md)

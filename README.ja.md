@@ -23,7 +23,7 @@
 
 というわけで、完全オフライン・超軽量・広告なし・完全無料・長期メンテの Material You 時間割ができました！
 
-> 現在のバージョン：**v1.2.0** · Android 8.0+ · arm64-v8a
+> 現在のバージョン：**v1.2.1** · Android 8.0+ · arm64-v8a
 
 ## Tomo のおすすめは FallAsleep 時間割！
 
@@ -50,6 +50,7 @@
 - **教務システム取り込み**：内蔵 WebView で手動ログインし、現在の時間割ページを取得して端末内で解析。
   - 新・旧正方（jwglxt）と強智の3テンプレートを自動判別。
   - PC版／モバイル版の UA を切り替え可能。PC でしか完全な時間割を出さない教務システムにも対応。
+  - 「パスワードを記憶」に対応。端末内に暗号化して保存し、次回ログイン画面へ自動入力。
   - 現在の時間割を上書きし、既存の授業時間設定をそのまま引き継ぐことも可能。
 - **ファイル取り込み**：JSON バックアップ、ICS カレンダー、CSV、旧 `.wakeup_schedule`。
 - JSON に学期設定が入っていれば、開始日・週数・授業時間をまとめて復元できます。
@@ -91,10 +92,10 @@
 
 安定版は [Releases](https://github.com/tukinokilyowsoo/FallAsleepTimetable/releases/latest) で公開しています：
 
-- ファイル：`FallAsleepTimetable_arm64_v1.2.0.apk`
+- ファイル：`FallAsleepTimetable_arm64_v1.2.1.apk`
 - アーキテクチャ：arm64-v8a（最近のスマホ・タブレットのほとんど）
 - サイズ：約 10.5 MB
-- SHA-256：`e299036edcc100e273158cbc3f4e0dc0dc5b5b34c8d25fa1bdb616e1b2b70858`
+- SHA-256：`dc636c6b510970d78fff39aea331a255a8ad283b36a7c33c40aa6a982f170e28`
 
 今後のベータ版は Pre-release として公開されます。設定 → 概要 →「アップデートを確認」から Beta プランに参加できます。
 
@@ -147,6 +148,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 ## 開発とドキュメント
 
 - [M0 記録](docs/M0-记录.md) / [M1 記録](docs/M1-记录.md) / [M2 記録](docs/M2-记录.md) / [M3 記録](docs/M3-记录.md)
+- [v1.2.1 リリースノート](docs/RELEASE-NOTES-v1.2.1.md)
 - [v1.2.0 リリースノート](docs/RELEASE-NOTES-v1.2.0.md)
 - [v1.1.0 リリースノート](docs/RELEASE-NOTES-v1.1.0.md)
 - [v1.0.0 リリースノート](docs/RELEASE-NOTES-v1.0.0.md)
