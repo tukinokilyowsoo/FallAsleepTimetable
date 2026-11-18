@@ -22,8 +22,8 @@ android {
         applicationId = "io.github.tukinokilyowsoo.fallasleeptimetable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 27
-        versionName = "1.2.0"
+        versionCode = 28
+        versionName = "1.2.1"
 
         ndk {
             abiFilters += listOf("arm64-v8a")

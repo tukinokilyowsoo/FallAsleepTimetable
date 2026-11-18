@@ -28,7 +28,10 @@ object EduScheduleParser {
         require(html.isNotBlank()) { "页面内容为空" }
         val document = Jsoup.parse(html, "UTF-8")
         val template = detect(document)
-            ?: error("没有识别到课表结构，请确认已经打开个人课表页面")
+            ?: error(
+                "没有识别到课表结构。请先进入教务系统的「个人课表」页面，" +
+                    "等课程加载完成后再抓取。",
+            )
 
         val courses = when (template) {
             EduTemplate.NEW_FZ -> parseNewFz(document)

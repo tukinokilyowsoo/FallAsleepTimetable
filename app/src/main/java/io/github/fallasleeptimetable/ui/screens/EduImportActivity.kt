@@ -2,9 +2,17 @@ package io.github.fallasleeptimetable.ui.screens
 
 import android.content.Context
 import android.content.Intent
+import android.net.http.SslError
 import android.os.Bundle
+import android.os.Message
 import android.net.Uri
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.SslErrorHandler
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -55,9 +63,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.fallasleeptimetable.data.AppContainer
+import io.github.fallasleeptimetable.data.EduCredentialStore
 import io.github.fallasleeptimetable.data.diagnostics.ImportLog
 import io.github.fallasleeptimetable.data.importer.EduParseResult
 import io.github.fallasleeptimetable.data.importer.EduScheduleParser
@@ -69,6 +79,7 @@ import io.github.fallasleeptimetable.ui.weekRangeLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import org.json.JSONTokener
 
 class EduImportActivity : ComponentActivity() {
@@ -123,26 +134,106 @@ class EduImportActivity : ComponentActivity() {
 
 private const val GRAB_PAGE_JS = """
 (function() {
-  var html = document.documentElement ? document.documentElement.outerHTML : '';
-  var frames = document.getElementsByTagName('iframe');
-  for (var i = 0; i < frames.length; i++) {
-    try {
-      var doc = frames[i].contentDocument;
-      if (doc && doc.documentElement) {
-        html += doc.documentElement.outerHTML;
-      }
-    } catch (e) {}
+  function collect(doc, depth) {
+    if (!doc || !doc.documentElement) return '';
+    var html = doc.documentElement.outerHTML || '';
+    if (depth >= 3) return html;
+    var frames = doc.getElementsByTagName('iframe');
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        html += collect(frames[i].contentDocument, depth + 1);
+      } catch (e) {}
+    }
+    return html;
   }
-  return html;
+  return collect(document, 0);
+})()
+"""
+
+/** 登录页自动填充：只在可见的密码框存在时填写，且不覆盖用户已输入的内容。 */
+private fun autoFillCredentialsJs(account: String, password: String): String = """
+(function() {
+  var account = ${JSONObject.quote(account)};
+  var password = ${JSONObject.quote(password)};
+  function visible(el) {
+    return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+  }
+  function writable(el) {
+    return el && !el.value && !el.disabled && !el.readOnly;
+  }
+  var pwd = null;
+  var pwds = document.querySelectorAll('input[type="password"]');
+  for (var i = 0; i < pwds.length; i++) {
+    if (visible(pwds[i]) && writable(pwds[i])) { pwd = pwds[i]; break; }
+  }
+  if (!pwd) return;
+  var form = pwd.form || document;
+  var user = form.querySelector('#userAccount, #username, input[name="userAccount"], input[name="username"], input[name="account"]');
+  if (!writable(user)) {
+    user = null;
+    var inputs = form.querySelectorAll('input[type="text"], input[type="tel"], input:not([type])');
+    for (var j = 0; j < inputs.length; j++) {
+      if (visible(inputs[j]) && writable(inputs[j])) { user = inputs[j]; break; }
+    }
+  }
+  function setValue(el, value) {
+    var proto = Object.getPrototypeOf(el);
+    var desc = Object.getOwnPropertyDescriptor(proto, 'value');
+    if (desc && desc.set) desc.set.call(el, value); else el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (user) setValue(user, account);
+  setValue(pwd, password);
 })()
 """
 
 private const val MAX_HTML_CHARS = 2_000_000
 
+/**
+ * 不少教务系统（如正方 jsxsd）是 1200px 起的桌面布局，但页面自己写了
+ * width=device-width 的 viewport，手机上只能看到左侧一小条，像白屏。
+ * 检测到内容明显宽于屏幕时，把布局宽度改成实际内容宽度，让系统缩放整页。
+ */
+private const val FIT_WIDE_PAGE_JS = """
+(function() {
+  function fit() {
+    var doc = document.documentElement;
+    if (!doc) return;
+    var screenWidth = window.innerWidth || 0;
+    var contentWidth = Math.max(
+      doc.scrollWidth || 0,
+      document.body ? document.body.scrollWidth : 0
+    );
+    if (screenWidth <= 0 || contentWidth < 720) return;
+    if (contentWidth <= screenWidth * 1.25) return;
+    var meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'viewport');
+      if (document.head) document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', 'width=' + Math.ceil(contentWidth));
+  }
+  fit();
+  setTimeout(fit, 300);
+})()
+"""
+
 /** 桌面 Chrome UA：部分教务系统只对电脑端提供完整课表页面。 */
 private const val DESKTOP_USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+
+/**
+ * 普通手机 Chrome UA。
+ *
+ * WebView 默认 UA 带 "; wv" 和 "Version/4.0"，一些教务系统会据此
+ * 返回残缺页面或直接拦下主界面；换成浏览器 UA 后与系统浏览器一致。
+ */
+private const val MOBILE_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36"
 
 /** 只允许 http/https，避免 file:、content:、javascript: 等 scheme 进入 WebView。 */
 private fun normalizeWebUrl(input: String): String? {
@@ -190,30 +281,183 @@ fun EduImportScreen(
     var desktopUserAgent by rememberSaveable {
         mutableStateOf(prefs.getBoolean("edu_desktop_ua", false))
     }
+    var rememberPassword by rememberSaveable {
+        mutableStateOf(prefs.getBoolean("edu_remember_password", false))
+    }
+    var showCredentialDialog by remember { mutableStateOf(false) }
+    // 用户输入 http 时先尝试 https，失败再退回 http；避免 http 页面里
+    // 被 CSP 升级到 https 的子资源 / iframe 变成跨源，导致 CORS 或取不到内容。
+    var httpFallbackUrl by remember { mutableStateOf<String?>(null) }
 
     val webView = remember {
         WebView(context).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            settings.databaseEnabled = true
             settings.loadWithOverviewMode = true
             settings.useWideViewPort = true
             settings.builtInZoomControls = true
             settings.displayZoomControls = false
-            settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-            settings.allowFileAccess = false
-            settings.allowContentAccess = false
-            settings.setAllowFileAccessFromFileURLs(false)
-            settings.setAllowUniversalAccessFromFileURLs(false)
-            settings.saveFormData = false
-            webViewClient = WebViewClient()
+            // TODO: 排查白屏期间暂时放宽安全限制，确认原因后恢复严格配置。
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            settings.allowFileAccess = true
+            settings.allowContentAccess = true
+            settings.setAllowFileAccessFromFileURLs(true)
+            settings.setAllowUniversalAccessFromFileURLs(true)
+            settings.saveFormData = true
+            CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+            // 办事大厅一类门户用 window.open / target=_blank 打开教务系统。
+            settings.setSupportMultipleWindows(true)
+            settings.javaScriptCanOpenWindowsAutomatically = true
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView, url: String) {
+                    super.onPageFinished(view, url)
+                    httpFallbackUrl = null
+                    view.evaluateJavascript(FIT_WIDE_PAGE_JS, null)
+                    val host = runCatching { Uri.parse(url).host }.getOrNull()
+                    val remember = context
+                        .getSharedPreferences("settings", Context.MODE_PRIVATE)
+                        .getBoolean("edu_remember_password", false)
+                    if (remember && !host.isNullOrBlank()) {
+                        EduCredentialStore.load(context, host)?.let { credentials ->
+                            view.evaluateJavascript(
+                                autoFillCredentialsJs(
+                                    credentials.account,
+                                    credentials.password,
+                                ),
+                                null,
+                            )
+                        }
+                    }
+                }
+
+                override fun onReceivedError(
+                    view: WebView,
+                    request: WebResourceRequest,
+                    error: WebResourceError,
+                ) {
+                    val failedUrl = request.url?.toString().orEmpty()
+                    if (request.isForMainFrame && failedUrl.startsWith("https://")) {
+                        httpFallbackUrl?.let { fallback ->
+                            httpFallbackUrl = null
+                            view.loadUrl(fallback)
+                            return
+                        }
+                    }
+                    ImportLog.append(
+                        context,
+                        header = buildString {
+                            append("WebView 加载失败\n")
+                            append("frame=")
+                                .append(if (request.isForMainFrame) "main" else "sub")
+                                .append('\n')
+                            append("url=").append(request.url).append('\n')
+                            append("code=").append(error.errorCode).append('\n')
+                            append("error=").append(error.description)
+                        },
+                    )
+                }
+
+                override fun onReceivedSslError(
+                    view: WebView,
+                    handler: SslErrorHandler,
+                    sslError: SslError,
+                ) {
+                    handler.cancel()
+                    val fallback = httpFallbackUrl
+                    if (fallback != null) {
+                        httpFallbackUrl = null
+                        view.loadUrl(fallback)
+                    } else {
+                        ImportLog.append(
+                            context,
+                            header = "WebView 证书错误\nurl=${sslError.url}",
+                        )
+                    }
+                }
+
+                override fun onReceivedHttpError(
+                    view: WebView,
+                    request: WebResourceRequest,
+                    response: WebResourceResponse,
+                ) {
+                    ImportLog.append(
+                        context,
+                        header = buildString {
+                            append("WebView 返回错误\n")
+                            append("frame=")
+                                .append(if (request.isForMainFrame) "main" else "sub")
+                                .append('\n')
+                            append("url=").append(request.url).append('\n')
+                            append("status=").append(response.statusCode)
+                        },
+                    )
+                }
+            }
+            webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                    if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                        ImportLog.append(
+                            context,
+                            header = buildString {
+                                append("WebView 脚本错误\n")
+                                append("source=").append(message.sourceId())
+                                append(':').append(message.lineNumber()).append('\n')
+                                append("message=").append(message.message())
+                            },
+                        )
+                    }
+                    return true
+                }
+
+                override fun onCreateWindow(
+                    view: WebView,
+                    isDialog: Boolean,
+                    isUserGesture: Boolean,
+                    resultMsg: Message,
+                ): Boolean {
+                    val transport = resultMsg.obj as? WebView.WebViewTransport
+                        ?: return false
+                    val popup = WebView(view.context).apply {
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(
+                                popupView: WebView,
+                                request: WebResourceRequest,
+                            ): Boolean {
+                                val target = request.url?.toString() ?: return false
+                                if (target.startsWith("http://") ||
+                                    target.startsWith("https://")
+                                ) {
+                                    view.loadUrl(target)
+                                    popupView.destroy()
+                                    return true
+                                }
+                                return false
+                            }
+                        }
+                    }
+                    transport.webView = popup
+                    resultMsg.sendToTarget()
+                    return true
+                }
+            }
         }
     }
-    val defaultUserAgent = remember { webView.settings.userAgentString }
+
+    fun loadPreferred(target: String) {
+        val httpsUrl = if (target.startsWith("http://")) {
+            "https://" + target.removePrefix("http://")
+        } else {
+            null
+        }
+        httpFallbackUrl = httpsUrl?.let { target }
+        webView.loadUrl(httpsUrl ?: target)
+    }
 
     LaunchedEffect(Unit) {
         webView.settings.userAgentString =
-            if (desktopUserAgent) DESKTOP_USER_AGENT else defaultUserAgent
-        normalizeWebUrl(url)?.let(webView::loadUrl)
+            if (desktopUserAgent) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
+        normalizeWebUrl(url)?.let(::loadPreferred)
     }
 
     DisposableEffect(Unit) {
@@ -238,14 +482,41 @@ fun EduImportScreen(
         }
         url = normalized
         prefs.edit().putString("edu_url", normalized).apply()
-        webView.loadUrl(normalized)
+        loadPreferred(normalized)
+    }
+
+    fun currentHost(): String? {
+        val target = webView.url ?: normalizeWebUrl(url)
+        return runCatching { target?.let { Uri.parse(it).host } }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    fun setRememberPassword(enabled: Boolean) {
+        if (!enabled) {
+            rememberPassword = false
+            prefs.edit().putBoolean("edu_remember_password", false).apply()
+            EduCredentialStore.clear(context)
+            return
+        }
+        val host = currentHost()
+        if (host == null) {
+            error = "请先打开教务网址，再保存密码"
+            return
+        }
+        if (EduCredentialStore.load(context, host) != null) {
+            rememberPassword = true
+            prefs.edit().putBoolean("edu_remember_password", true).apply()
+        } else {
+            showCredentialDialog = true
+        }
     }
 
     fun setDesktopUserAgent(enabled: Boolean) {
         desktopUserAgent = enabled
         prefs.edit().putBoolean("edu_desktop_ua", enabled).apply()
         webView.settings.userAgentString =
-            if (enabled) DESKTOP_USER_AGENT else defaultUserAgent
+            if (enabled) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
         error = null
         // 重新加载一次，让教务系统按新 UA 返回对应布局。
         if (webView.url != null) webView.reload()
@@ -404,6 +675,44 @@ fun EduImportScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = { openUrl() }) { Text("打开") }
                 }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "记住密码",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = if (rememberPassword) {
+                                "已保存在本机，登录页会自动填入"
+                            } else {
+                                "仅保存在本机，使用系统密钥加密"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (rememberPassword) {
+                        TextButton(
+                            onClick = {
+                                if (currentHost() == null) {
+                                    error = "请先打开教务网址，再保存密码"
+                                } else {
+                                    showCredentialDialog = true
+                                }
+                            },
+                        ) { Text("修改") }
+                    }
+                    Switch(
+                        checked = rememberPassword,
+                        onCheckedChange = { setRememberPassword(it) },
+                    )
+                }
             }
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -439,7 +748,7 @@ fun EduImportScreen(
 
             if (parsed == null) {
                 Text(
-                    text = "手动登录后进入个人课表页面，再点右上角「抓取本页」。页面显示不全时，可切换「电脑版 / 手机版」。",
+                    text = "手动登录后进入个人课表页面，再点右上角「抓取本页」。页面显示不全时，可切换「电脑版 / 手机版」或双指放大。",
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -455,6 +764,41 @@ fun EduImportScreen(
             text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = { error = null }) { Text("好") }
+            },
+        )
+    }
+
+    if (showCredentialDialog) {
+        val host = currentHost().orEmpty()
+        CredentialDialog(
+            host = host,
+            initial = host.takeIf { it.isNotBlank() }
+                ?.let { EduCredentialStore.load(context, it) },
+            onDismiss = { showCredentialDialog = false },
+            onSave = { account, password ->
+                val targetHost = currentHost()
+                when {
+                    targetHost == null -> {
+                        showCredentialDialog = false
+                        error = "请先打开教务网址，再保存密码"
+                    }
+
+                    EduCredentialStore.save(
+                        context,
+                        targetHost,
+                        EduCredentialStore.Credentials(account, password),
+                    ) -> {
+                        rememberPassword = true
+                        prefs.edit().putBoolean("edu_remember_password", true).apply()
+                        showCredentialDialog = false
+                        webView.evaluateJavascript(
+                            autoFillCredentialsJs(account, password),
+                            null,
+                        )
+                    }
+
+                    else -> error = "保存密码失败，请重试"
+                }
             },
         )
     }
@@ -482,6 +826,60 @@ fun EduImportScreen(
             },
         )
     }
+}
+
+@Composable
+private fun CredentialDialog(
+    host: String,
+    initial: EduCredentialStore.Credentials?,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit,
+) {
+    var account by remember { mutableStateOf(initial?.account.orEmpty()) }
+    var password by remember { mutableStateOf(initial?.password.orEmpty()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("记住密码") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = if (host.isBlank()) {
+                        "登录信息仅保存在本机，使用系统密钥加密。"
+                    } else {
+                        "为 $host 保存登录信息，下次打开登录页会自动填入。" +
+                            "仅保存在本机，使用系统密钥加密。"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = account,
+                    onValueChange = { account = it },
+                    label = { Text("账号") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("密码") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(account.trim(), password) },
+                enabled = account.isNotBlank() && password.isNotEmpty(),
+            ) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
 }
 
 @Composable
