@@ -23,7 +23,7 @@ Done with splash ads! Done with shake-to-jump! Done with over-designed screens! 
 
 So here it is: a completely offline, featherweight, ad-free, absolutely free, long-term-maintained Material You timetable!
 
-> Current beta: **v1.2.0-beta1** · Stable: v1.1.0 · Android 8.0+ · arm64-v8a
+> Current version: **v1.2.0** · Android 8.0+ · arm64-v8a
 
 ## Tomo says: use FallAsleep Timetable!
 
@@ -49,6 +49,7 @@ So here it is: a completely offline, featherweight, ad-free, absolutely free, lo
 
 - **Academic system import**: a built-in WebView for manual login; grab the timetable page and parse it locally.
   - Supports new Zhengfang (jwglxt), old Zhengfang and Qiangzhi templates, detected automatically.
+  - Switch between desktop and mobile user agents for sites that only expose the full timetable to desktop browsers.
   - Optionally overwrite the current timetable while keeping its existing class-time setup.
 - **File import**: JSON backup, ICS calendar, CSV spreadsheet and the legacy `.wakeup_schedule`.
 - If a JSON backup carries term settings, you can restore the start date, week count and class times together.
@@ -69,6 +70,7 @@ Settings → Data:
 ### Home screen widgets
 
 - Today's classes: adapts to widget width — today / today + tomorrow / three days.
+- Today timeline: today's remaining classes in chronological order, with the current one highlighted.
 - Week timetable: pinned to the current week, overlapping classes in separate lanes, today's column in bold.
 - Each widget can pick its own timetable, toggle teacher/room and show upcoming days.
 - Refreshes within a minute after class ends (needs "Alarms & reminders"; otherwise the system's periodic refresh).
@@ -83,24 +85,18 @@ Settings → Data:
 ### Other
 
 - Update checks: GitHub by default, with a China mirror (gh-proxy for the API and APK download); a home-page snackbar when an update is available, with opt-out/opt-in and a Beta plan.
-- Dark mode (follow system / light / dark, widgets included), custom accent color, font scaling and TalkBack course descriptions.
+- Dark mode (follow system / light / dark, widgets included), custom accent color (Material palette presets + color wheel), font scaling and TalkBack course descriptions.
 
 ## Download & install
 
 Stable releases live in [Releases](https://github.com/tukinokilyowsoo/FallAsleepTimetable/releases/latest):
 
-- File: `FallAsleepTimetable_arm64_v1.1.0.apk`
+- File: `FallAsleepTimetable_arm64_v1.2.0.apk`
 - Architecture: arm64-v8a (most recent phones and tablets)
-- Size: about 11 MB
-- SHA-256: `d100826ca05a46f51ceca6e6ff21af0c9dc0427d44499e2ede6c32c8de3f8ccd`
+- Size: about 10.5 MB
+- SHA-256: `e299036edcc100e273158cbc3f4e0dc0dc5b5b34c8d25fa1bdb616e1b2b70858`
 
-Betas are marked as Pre-release in Releases:
-
-- Version: `v1.2.0-beta1`
-- File: `FallAsleepTimetable_arm64_v1.2.0-beta1.apk`
-- SHA-256: `22b68a2a578dc00817b59de33ca83677a3d3d39c59cfcca78f1911ddc548ccb7`
-
-You can join the Beta plan from Settings → About → Check for updates to receive future betas.
+Future betas are marked as Pre-release; join the Beta plan from Settings → About → Check for updates to receive them.
 
 Notes:
 
@@ -151,6 +147,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 ## Development & docs
 
 - [M0 notes](docs/M0-记录.md) / [M1 notes](docs/M1-记录.md) / [M2 notes](docs/M2-记录.md) / [M3 notes](docs/M3-记录.md)
+- [v1.2.0 release notes](docs/RELEASE-NOTES-v1.2.0.md)
 - [v1.1.0 release notes](docs/RELEASE-NOTES-v1.1.0.md)
 - [v1.0.0 release notes](docs/RELEASE-NOTES-v1.0.0.md)
 - [Third-party notices](THIRD-PARTY-NOTICES.md)

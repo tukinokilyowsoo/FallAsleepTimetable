@@ -4,15 +4,19 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -32,9 +37,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -59,18 +68,29 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -82,13 +102,21 @@ import io.github.fallasleeptimetable.data.calendar.CalendarScheduleExporter
 import io.github.fallasleeptimetable.data.diagnostics.ImportLog
 import io.github.fallasleeptimetable.data.TimetableEntity
 import io.github.fallasleeptimetable.ui.ScheduleUiState
+import io.github.fallasleeptimetable.ui.theme.DEFAULT_THEME_SEED
 import io.github.fallasleeptimetable.ui.theme.ThemeMode
+import io.github.fallasleeptimetable.ui.theme.androidThemePalettes
+import io.github.fallasleeptimetable.ui.theme.colorSchemeFromSeed
 import io.github.fallasleeptimetable.widget.WidgetRefreshScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 private val settingsDateFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
@@ -412,7 +440,7 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .size(28.dp)
                                 .clip(CircleShape)
-                                .background(Color(customColorArgb ?: DEFAULT_THEME_COLOR))
+                                .background(Color(customColorArgb ?: DEFAULT_THEME_SEED))
                                 .border(
                                     width = 1.dp,
                                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -1051,13 +1079,18 @@ fun SettingsScreen(
     }
 }
 
-private const val DEFAULT_THEME_COLOR = 0xFF4A5C92L
+private fun Long.toHexLabel(): String = String.format("#%06X", this and 0xFFFFFFL)
 
-private val themeColorPresets = listOf(
-    0xFF4A5C92L, 0xFF00696EL, 0xFF2E6A3EL, 0xFF8C5000L,
-    0xFF9C4146L, 0xFF7D5260L, 0xFF3F5F90L, 0xFF5D5F7FL,
-    0xFF6B5778L, 0xFF00658FL, 0xFF7A5900L, 0xFF4F6354L,
-)
+private fun hsvToThemeColor(hue: Float, saturation: Float, value: Float): Long {
+    val argb = AndroidColor.HSVToColor(
+        floatArrayOf(
+            ((hue % 360f) + 360f) % 360f,
+            saturation.coerceIn(0f, 1f),
+            value.coerceIn(0f, 1f),
+        ),
+    )
+    return 0xFF000000L or (argb.toLong() and 0xFFFFFFL)
+}
 
 @Composable
 private fun ThemeColorDialog(
@@ -1065,43 +1098,188 @@ private fun ThemeColorDialog(
     onDismiss: () -> Unit,
     onApply: (Long) -> Unit,
 ) {
-    var selected by remember { mutableStateOf(initialColor ?: DEFAULT_THEME_COLOR) }
-    var hexText by remember {
-        mutableStateOf(String.format("#%06X", selected and 0xFFFFFF))
+    val initial = initialColor ?: DEFAULT_THEME_SEED
+    val initialHsv = remember(initial) {
+        FloatArray(3).also { AndroidColor.colorToHSV(initial.toInt(), it) }
     }
+    var hue by remember { mutableFloatStateOf(initialHsv[0]) }
+    var saturation by remember { mutableFloatStateOf(initialHsv[1]) }
+    var value by remember { mutableFloatStateOf(initialHsv[2]) }
+    var hexText by remember { mutableStateOf(initial.toHexLabel()) }
     var hexError by remember { mutableStateOf(false) }
+
+    val selected = hsvToThemeColor(hue, saturation, value)
+    val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val previewScheme = remember(selected, darkTheme) {
+        colorSchemeFromSeed(Color(selected), darkTheme)
+    }
+
+    fun pick(h: Float, s: Float, v: Float) {
+        hue = h
+        saturation = s
+        value = v
+        hexText = hsvToThemeColor(h, s, v).toHexLabel()
+        hexError = false
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("自定义主题色") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                themeColorPresets.chunked(4).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = "拖动色环选颜色，再调整明度。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                HueSaturationWheel(
+                    hue = hue,
+                    saturation = saturation,
+                    value = value,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .size(196.dp),
+                    onPick = { h, s -> pick(h, s, value) },
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("明度", style = MaterialTheme.typography.labelLarge)
+                    BrightnessSlider(
+                        hue = hue,
+                        saturation = saturation,
+                        value = value,
+                        onValueChange = { pick(hue, saturation, it) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = "${(value * 100).roundToInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                // 用生成的语义色画一个迷你课表卡片，直接看浅色/深色下的层级。
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(previewScheme.surfaceContainer)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "课程表",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = previewScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = selected.toHexLabel(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = previewScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = "高等数学 · 教三 201",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = previewScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PreviewChip("今天", previewScheme.primary, previewScheme.onPrimary)
+                        PreviewChip(
+                            "周三",
+                            previewScheme.secondaryContainer,
+                            previewScheme.onSecondaryContainer,
+                        )
+                        PreviewChip(
+                            "第 3 节",
+                            previewScheme.tertiaryContainer,
+                            previewScheme.onTertiaryContainer,
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Material 调色板",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                androidThemePalettes.chunked(4).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         row.forEach { preset ->
-                            Box(
+                            val isSelected =
+                                (selected and 0xFFFFFFL) == (preset.seed and 0xFFFFFFL)
+                            val presetColor = Color(preset.seed)
+                            Column(
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(preset))
-                                    .border(
-                                        width = if (selected == preset) 3.dp else 1.dp,
-                                        color = if (selected == preset) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.outlineVariant
-                                        },
-                                        shape = CircleShape,
-                                    )
-                                    .clickable {
-                                        selected = preset
-                                        hexText = String.format(
-                                            "#%06X",
-                                            preset and 0xFFFFFF,
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable(onClickLabel = "使用${preset.name}") {
+                                        val presetHsv = FloatArray(3)
+                                        AndroidColor.colorToHSV(preset.seed.toInt(), presetHsv)
+                                        pick(presetHsv[0], presetHsv[1], presetHsv[2])
+                                    }
+                                    .semantics {
+                                        contentDescription = preset.name
+                                    }
+                                    .padding(vertical = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(presetColor)
+                                        .border(
+                                            width = if (isSelected) 3.dp else 1.dp,
+                                            color = if (isSelected) {
+                                                MaterialTheme.colorScheme.onSurface
+                                            } else {
+                                                MaterialTheme.colorScheme.outlineVariant
+                                            },
+                                            shape = CircleShape,
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Check,
+                                            contentDescription = null,
+                                            tint = if (presetColor.luminance() > 0.5f) {
+                                                Color.Black
+                                            } else {
+                                                Color.White
+                                            },
+                                            modifier = Modifier.size(20.dp),
                                         )
-                                        hexError = false
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = preset.name,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.onSurface
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
                                     },
-                            )
+                                    maxLines = 1,
+                                )
+                            }
                         }
                     }
                 }
@@ -1112,7 +1290,14 @@ private fun ThemeColorDialog(
                         hexText = input
                         val parsed = parseHexColor(input)
                         if (parsed != null) {
-                            selected = parsed
+                            val typedHsv = FloatArray(3)
+                            AndroidColor.colorToHSV(parsed.toInt(), typedHsv)
+                            // 黑白没有色相/饱和度，保留上一次的取值，方便再调回来。
+                            if (typedHsv[2] > 0.001f) value = typedHsv[2]
+                            if (typedHsv[1] > 0.001f) saturation = typedHsv[1]
+                            if (typedHsv[1] > 0.001f && typedHsv[2] > 0.001f) {
+                                hue = typedHsv[0]
+                            }
                             hexError = false
                         } else {
                             hexError = true
@@ -1122,21 +1307,10 @@ private fun ThemeColorDialog(
                     singleLine = true,
                     isError = hexError,
                     supportingText = {
-                        if (hexError) Text("格式应为 #RRGGBB")
+                        Text(if (hexError) "格式应为 #RRGGBB" else "也可以直接输入 #RRGGBB")
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("预览", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(Color(selected)),
-                    )
-                }
             }
         },
         confirmButton = {
@@ -1149,6 +1323,198 @@ private fun ThemeColorDialog(
             TextButton(onClick = onDismiss) { Text("取消") }
         },
     )
+}
+
+@Composable
+private fun PreviewChip(label: String, background: Color, contentColor: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(background)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor,
+        )
+    }
+}
+
+/** HSV 色环：角度选色相，半径选饱和度，整体按明度压暗。 */
+@Composable
+private fun HueSaturationWheel(
+    hue: Float,
+    saturation: Float,
+    value: Float,
+    modifier: Modifier = Modifier,
+    onPick: (hue: Float, saturation: Float) -> Unit,
+) {
+    val currentOnPick by rememberUpdatedState(onPick)
+
+    Canvas(
+        modifier = modifier
+            .semantics { contentDescription = "色环，拖动选择颜色" }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    fun pick(position: Offset) {
+                        val radius = minOf(size.width, size.height) / 2f
+                        if (radius <= 0f) return
+                        val dx = position.x - size.width / 2f
+                        val dy = position.y - size.height / 2f
+                        val distance = sqrt(dx * dx + dy * dy).coerceAtMost(radius)
+                        val degrees = Math.toDegrees(
+                            atan2(dy.toDouble(), dx.toDouble()),
+                        ).toFloat()
+                        currentOnPick((degrees + 360f) % 360f, distance / radius)
+                    }
+
+                    val down = awaitFirstDown()
+                    pick(down.position)
+                    down.consume()
+                    var event = awaitPointerEvent()
+                    while (event.changes.any { it.pressed }) {
+                        val change = event.changes.firstOrNull { it.pressed } ?: break
+                        pick(change.position)
+                        change.consume()
+                        event = awaitPointerEvent()
+                    }
+                }
+            },
+    ) {
+        val radius = size.minDimension / 2f
+        val center = Offset(size.width / 2f, size.height / 2f)
+        drawCircle(
+            brush = Brush.sweepGradient(
+                colors = listOf(
+                    Color.Red,
+                    Color.Yellow,
+                    Color.Green,
+                    Color.Cyan,
+                    Color.Blue,
+                    Color.Magenta,
+                    Color.Red,
+                ),
+                center = center,
+            ),
+            radius = radius,
+            center = center,
+        )
+        // 圆心趋白，模拟饱和度 0 → 1。
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color.White, Color.White.copy(alpha = 0f)),
+                center = center,
+                radius = radius,
+            ),
+            radius = radius,
+            center = center,
+        )
+        if (value < 1f) {
+            drawCircle(
+                color = Color.Black.copy(alpha = 1f - value),
+                radius = radius,
+                center = center,
+            )
+        }
+        val angle = Math.toRadians(hue.toDouble())
+        val distance = saturation.coerceIn(0f, 1f) * radius
+        val marker = Offset(
+            center.x + cos(angle).toFloat() * distance,
+            center.y + sin(angle).toFloat() * distance,
+        )
+        drawCircle(
+            color = Color.White,
+            radius = 9.dp.toPx(),
+            center = marker,
+            style = Stroke(width = 3.dp.toPx()),
+        )
+        drawCircle(
+            color = Color.Black.copy(alpha = 0.45f),
+            radius = 10.5.dp.toPx(),
+            center = marker,
+            style = Stroke(width = 1.dp.toPx()),
+        )
+    }
+}
+
+/** 明度滑杆：黑 → 当前色相/饱和度的最亮色。 */
+@Composable
+private fun BrightnessSlider(
+    hue: Float,
+    saturation: Float,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
+    val brightColor = remember(hue, saturation) {
+        Color(hsvToThemeColor(hue, saturation.coerceAtLeast(0.05f), 1f))
+    }
+    val trackOutline = MaterialTheme.colorScheme.outlineVariant
+    val thumbFill = MaterialTheme.colorScheme.surface
+
+    Canvas(
+        modifier = modifier
+            .height(48.dp)
+            .semantics { contentDescription = "明度，左右拖动调整" }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val thumbRadius = 10.dp.toPx()
+                    val usable = (size.width - thumbRadius * 2f).coerceAtLeast(1f)
+
+                    fun pick(position: Offset) {
+                        currentOnValueChange(
+                            ((position.x - thumbRadius) / usable).coerceIn(0f, 1f),
+                        )
+                    }
+
+                    val down = awaitFirstDown()
+                    pick(down.position)
+                    down.consume()
+                    var event = awaitPointerEvent()
+                    while (event.changes.any { it.pressed }) {
+                        val change = event.changes.firstOrNull { it.pressed } ?: break
+                        pick(change.position)
+                        change.consume()
+                        event = awaitPointerEvent()
+                    }
+                }
+            },
+    ) {
+        val trackHeight = 18.dp.toPx()
+        val top = (size.height - trackHeight) / 2f
+        val radius = trackHeight / 2f
+        drawRoundRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Black, brightColor),
+                startX = 0f,
+                endX = size.width,
+            ),
+            topLeft = Offset(0f, top),
+            size = Size(size.width, trackHeight),
+            cornerRadius = CornerRadius(radius),
+        )
+        drawRoundRect(
+            color = trackOutline,
+            topLeft = Offset(0f, top),
+            size = Size(size.width, trackHeight),
+            cornerRadius = CornerRadius(radius),
+            style = Stroke(width = 1.dp.toPx()),
+        )
+
+        val thumbRadius = 10.dp.toPx()
+        val thumbX = value.coerceIn(0f, 1f) * (size.width - thumbRadius * 2f) + thumbRadius
+        val thumbCenter = Offset(thumbX, size.height / 2f)
+        drawCircle(color = thumbFill, radius = thumbRadius, center = thumbCenter)
+        drawCircle(
+            color = trackOutline,
+            radius = thumbRadius,
+            center = thumbCenter,
+            style = Stroke(width = 1.5.dp.toPx()),
+        )
+        drawCircle(color = brightColor, radius = thumbRadius * 0.45f, center = thumbCenter)
+    }
 }
 
 private fun parseHexColor(input: String): Long? {

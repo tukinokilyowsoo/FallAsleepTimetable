@@ -23,7 +23,7 @@
 
 于是乎就有了这个完全离线、超轻量、无广告、完全免费、长期维护的 Material You 课程表！
 
-> 当前测试版：**v1.2.0-beta1** · 稳定版：v1.1.0 · Android 8.0+ · arm64-v8a
+> 当前版本：**v1.2.0** · Android 8.0+ · arm64-v8a
 
 ## Tomo 推荐使用 FallAsleep 课程表！
 
@@ -46,6 +46,7 @@
 
 - **教务导入**：内置 WebView 手动登录，抓取当前课表页后在本地解析。
   - 支持新版正方（jwglxt）、老正方、强智三套模板，自动识别。
+  - 可切换电脑版 / 手机版 UA，适配只给电脑端完整课表的教务系统。
   - 可选择覆盖当前课表，沿用该表已有的上课时间配置。
 - **文件导入**：JSON 备份、ICS 日历、CSV 表格、旧版 `.wakeup_schedule`。
 - JSON 备份包含学期设置时，可选择一并恢复开学日期、周数和上课时间。
@@ -65,6 +66,7 @@
 ### 桌面小组件
 
 - 今日课程：按组件宽度显示今天 / 今天+明天 / 三天。
+- 今日时间轴：按时间顺序显示今天剩余课程，当前课程高亮。
 - 周课表：固定当前周，重叠课程分栏，今天列加粗。
 - 每个组件可单独选择课表、显示教师 / 教室、显示后续日期。
 - 下课后 1 分钟内刷新（需授予「闹钟和提醒」权限）。
@@ -79,24 +81,18 @@
 ### 其他
 
 - 检查更新：默认 GitHub 源，提供国内镜像（gh-proxy 加速 API 与 APK 下载）；有可用版本时在主页弹出提醒，可拒收 / 恢复更新提醒，也可加入 Beta 计划接收测试版。
-- 深色模式（跟随系统 / 浅色 / 深色，小组件同步）、自定义主题色、字体缩放、TalkBack 课程描述。
+- 深色模式（跟随系统 / 浅色 / 深色，小组件同步）、自定义主题色（Material 调色板预设 + 色环取色）、字体缩放、TalkBack 课程描述。
 
 ## 下载与安装
 
 正式版发布于 [Releases](https://github.com/tukinokilyowsoo/FallAsleepTimetable/releases/latest)：
 
-- 文件：`FallAsleepTimetable_arm64_v1.1.0.apk`
+- 文件：`FallAsleepTimetable_arm64_v1.2.0.apk`
 - 架构：arm64-v8a（绝大多数近年的手机与平板）
-- 大小：约 11 MB
-- SHA-256：`d100826ca05a46f51ceca6e6ff21af0c9dc0427d44499e2ede6c32c8de3f8ccd`
+- 大小：约 10.5 MB
+- SHA-256：`e299036edcc100e273158cbc3f4e0dc0dc5b5b34c8d25fa1bdb616e1b2b70858`
 
-测试版在 Releases 中标记为 Pre-release：
-
-- 版本：`v1.2.0-beta1`
-- 文件：`FallAsleepTimetable_arm64_v1.2.0-beta1.apk`
-- SHA-256：`22b68a2a578dc00817b59de33ca83677a3d3d39c59cfcca78f1911ddc548ccb7`
-
-在设置 → 关于 →「检查更新」中可加入 Beta 计划，接收后续测试版。
+后续测试版会标记为 Pre-release；在设置 → 关于 →「检查更新」中可加入 Beta 计划接收。
 
 说明：
 
@@ -146,6 +142,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 ## 开发与文档
 
 - [M0 记录](docs/M0-记录.md) / [M1 记录](docs/M1-记录.md) / [M2 记录](docs/M2-记录.md) / [M3 记录](docs/M3-记录.md)
+- [v1.2.0 正式版说明](docs/RELEASE-NOTES-v1.2.0.md)
 - [v1.1.0 正式版说明](docs/RELEASE-NOTES-v1.1.0.md)
 - [v1.0.0 正式版说明](docs/RELEASE-NOTES-v1.0.0.md)
 - [第三方依赖声明](THIRD-PARTY-NOTICES.md)

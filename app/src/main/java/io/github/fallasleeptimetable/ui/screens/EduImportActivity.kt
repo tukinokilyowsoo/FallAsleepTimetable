@@ -44,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -138,6 +139,11 @@ private const val GRAB_PAGE_JS = """
 
 private const val MAX_HTML_CHARS = 2_000_000
 
+/** 桌面 Chrome UA：部分教务系统只对电脑端提供完整课表页面。 */
+private const val DESKTOP_USER_AGENT =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+
 /** 只允许 http/https，避免 file:、content:、javascript: 等 scheme 进入 WebView。 */
 private fun normalizeWebUrl(input: String): String? {
     val trimmed = input.trim()
@@ -181,6 +187,9 @@ fun EduImportScreen(
     var importing by remember { mutableStateOf(false) }
     var overwriteCurrent by rememberSaveable { mutableStateOf(false) }
     var pendingOverwriteConfirm by remember { mutableStateOf(false) }
+    var desktopUserAgent by rememberSaveable {
+        mutableStateOf(prefs.getBoolean("edu_desktop_ua", false))
+    }
 
     val webView = remember {
         WebView(context).apply {
@@ -197,8 +206,14 @@ fun EduImportScreen(
             settings.setAllowUniversalAccessFromFileURLs(false)
             settings.saveFormData = false
             webViewClient = WebViewClient()
-            normalizeWebUrl(url)?.let(::loadUrl)
         }
+    }
+    val defaultUserAgent = remember { webView.settings.userAgentString }
+
+    LaunchedEffect(Unit) {
+        webView.settings.userAgentString =
+            if (desktopUserAgent) DESKTOP_USER_AGENT else defaultUserAgent
+        normalizeWebUrl(url)?.let(webView::loadUrl)
     }
 
     DisposableEffect(Unit) {
@@ -224,6 +239,16 @@ fun EduImportScreen(
         url = normalized
         prefs.edit().putString("edu_url", normalized).apply()
         webView.loadUrl(normalized)
+    }
+
+    fun setDesktopUserAgent(enabled: Boolean) {
+        desktopUserAgent = enabled
+        prefs.edit().putBoolean("edu_desktop_ua", enabled).apply()
+        webView.settings.userAgentString =
+            if (enabled) DESKTOP_USER_AGENT else defaultUserAgent
+        error = null
+        // 重新加载一次，让教务系统按新 UA 返回对应布局。
+        if (webView.url != null) webView.reload()
     }
 
     fun grabPage() {
@@ -342,6 +367,9 @@ fun EduImportScreen(
                 },
                 actions = {
                     if (parsed == null) {
+                        TextButton(onClick = { setDesktopUserAgent(!desktopUserAgent) }) {
+                            Text(if (desktopUserAgent) "手机版" else "电脑版")
+                        }
                         TextButton(onClick = { grabPage() }, enabled = !loading) {
                             Text(if (loading) "抓取中…" else "抓取本页")
                         }
@@ -411,7 +439,7 @@ fun EduImportScreen(
 
             if (parsed == null) {
                 Text(
-                    text = "手动登录后进入个人课表页面，再点右上角「抓取本页」。",
+                    text = "手动登录后进入个人课表页面，再点右上角「抓取本页」。页面显示不全时，可切换「电脑版 / 手机版」。",
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
