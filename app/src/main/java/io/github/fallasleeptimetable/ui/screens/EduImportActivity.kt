@@ -2,9 +2,13 @@ package io.github.fallasleeptimetable.ui.screens
 
 import android.content.Context
 import android.content.Intent
-import android.os.Bundle
+import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Bundle
 import android.webkit.CookieManager
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -66,6 +70,7 @@ import io.github.fallasleeptimetable.ui.periodLabel
 import io.github.fallasleeptimetable.ui.theme.FallAsleepTheme
 import io.github.fallasleeptimetable.ui.theme.ThemeMode
 import io.github.fallasleeptimetable.ui.weekRangeLabel
+import java.net.URI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -121,23 +126,38 @@ class EduImportActivity : ComponentActivity() {
     }
 }
 
+private const val MAX_HTML_CHARS = 2_000_000
+
 private const val GRAB_PAGE_JS = """
 (function() {
-  var html = document.documentElement ? document.documentElement.outerHTML : '';
-  var frames = document.getElementsByTagName('iframe');
-  for (var i = 0; i < frames.length; i++) {
-    try {
-      var doc = frames[i].contentDocument;
-      if (doc && doc.documentElement) {
-        html += doc.documentElement.outerHTML;
-      }
-    } catch (e) {}
+  var docs = [document];
+  var html = '';
+  for (var i = 0; i < docs.length; i++) {
+    var doc = docs[i];
+    if (!doc.documentElement) continue;
+    html += doc.documentElement.outerHTML;
+    if (html.length > $MAX_HTML_CHARS) return html.slice(0, $MAX_HTML_CHARS + 1);
+
+    var frames = doc.querySelectorAll('iframe, frame');
+    for (var j = 0; j < frames.length; j++) {
+      var child = frames[j].contentDocument;
+      if (child) docs.push(child);
+    }
   }
   return html;
 })()
 """
 
-private const val MAX_HTML_CHARS = 2_000_000
+internal fun hbvtcScheduleUrl(pageUrl: String?): String? {
+    val page = pageUrl?.let { runCatching { URI(it) }.getOrNull() } ?: return null
+    if (page.scheme !in listOf("http", "https") || page.userInfo != null ||
+        !"jwgl.hbvtc.edu.cn".equals(page.host, ignoreCase = true) ||
+        page.rawPath !in listOf("/jsxsd/framework/xsMainV.htmlx", "/jsxsd/framework/xsMainV_new.htmlx")
+    ) {
+        return null
+    }
+    return page.resolve("/jsxsd/xskb/xskb_list.do").toString()
+}
 
 /** 桌面 Chrome UA：部分教务系统只对电脑端提供完整课表页面。 */
 private const val DESKTOP_USER_AGENT =
@@ -183,6 +203,8 @@ fun EduImportScreen(
     }
     var parsed by remember { mutableStateOf<EduParseResult?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var pageError by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var currentPageUrl by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var overwriteCurrent by rememberSaveable { mutableStateOf(false) }
@@ -205,7 +227,37 @@ fun EduImportScreen(
             settings.setAllowFileAccessFromFileURLs(false)
             settings.setAllowUniversalAccessFromFileURLs(false)
             settings.saveFormData = false
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+                    currentPageUrl = url
+                    // WebView can report an HTTP error before onPageStarted for the same page.
+                    if (pageError?.first != url) pageError = null
+                }
+
+                override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+                    currentPageUrl = url
+                }
+
+                override fun onReceivedError(
+                    view: WebView,
+                    request: WebResourceRequest,
+                    error: WebResourceError,
+                ) {
+                    if (request.isForMainFrame) {
+                        pageError = request.url.toString() to "教务页面加载失败（错误 ${error.errorCode}）"
+                    }
+                }
+
+                override fun onReceivedHttpError(
+                    view: WebView,
+                    request: WebResourceRequest,
+                    errorResponse: WebResourceResponse,
+                ) {
+                    if (request.isForMainFrame) {
+                        pageError = request.url.toString() to "教务服务器返回 HTTP ${errorResponse.statusCode}"
+                    }
+                }
+            }
         }
     }
     val defaultUserAgent = remember { webView.settings.userAgentString }
@@ -225,6 +277,16 @@ fun EduImportScreen(
         }
     }
 
+    fun loadPage(destination: String) {
+        pageError = null
+        webView.loadUrl(destination)
+    }
+
+    fun reloadPage() {
+        pageError = null
+        webView.reload()
+    }
+
     fun openUrl() {
         val input = url.trim()
         if (input.isEmpty()) {
@@ -238,7 +300,7 @@ fun EduImportScreen(
         }
         url = normalized
         prefs.edit().putString("edu_url", normalized).apply()
-        webView.loadUrl(normalized)
+        loadPage(normalized)
     }
 
     fun setDesktopUserAgent(enabled: Boolean) {
@@ -248,7 +310,7 @@ fun EduImportScreen(
             if (enabled) DESKTOP_USER_AGENT else defaultUserAgent
         error = null
         // 重新加载一次，让教务系统按新 UA 返回对应布局。
-        if (webView.url != null) webView.reload()
+        if (webView.url != null) reloadPage()
     }
 
     fun grabPage() {
@@ -403,6 +465,25 @@ fun EduImportScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = { openUrl() }) { Text("打开") }
+                }
+
+                hbvtcScheduleUrl(currentPageUrl)?.let { scheduleUrl ->
+                    TextButton(
+                        onClick = { loadPage(scheduleUrl) },
+                        enabled = !loading,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    ) {
+                        Text("出现登陆后白屏问题？可能出现请求跨域拦截，点此打开学期理论课表")
+                    }
+                }
+                pageError?.second?.let { message ->
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(message, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { reloadPage() }) { Text("重试") }
+                    }
                 }
             }
 
