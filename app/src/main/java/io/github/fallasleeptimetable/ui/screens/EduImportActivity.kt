@@ -2,6 +2,7 @@ package io.github.fallasleeptimetable.ui.screens
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.http.SslError
 import android.os.Bundle
 import android.os.Message
@@ -76,6 +77,7 @@ import io.github.fallasleeptimetable.ui.periodLabel
 import io.github.fallasleeptimetable.ui.theme.FallAsleepTheme
 import io.github.fallasleeptimetable.ui.theme.ThemeMode
 import io.github.fallasleeptimetable.ui.weekRangeLabel
+import java.net.URI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -132,21 +134,65 @@ class EduImportActivity : ComponentActivity() {
     }
 }
 
+private const val MAX_HTML_CHARS = 2_000_000
+
 private const val GRAB_PAGE_JS = """
 (function() {
+  var html = '';
+  var theory = null;
   function collect(doc, depth) {
-    if (!doc || !doc.documentElement) return '';
-    var html = doc.documentElement.outerHTML || '';
-    if (depth >= 3) return html;
-    var frames = doc.getElementsByTagName('iframe');
-    for (var i = 0; i < frames.length; i++) {
+    if (!doc || !doc.documentElement || theory !== null) return;
+    var page = doc.location;
+    if (page && page.hostname === 'jwgl.hbvtc.edu.cn' && page.pathname === '/jsxsd/xskb/xskb_list.do') {
+      var table = doc.querySelector('table#timetable');
+      if (table) {
+        var snapshot = table.cloneNode(true);
+        snapshot.querySelectorAll('input, script, style, .kbcontent1').forEach(function(node) {
+          node.remove();
+        });
+        theory = snapshot.outerHTML.slice(0, $MAX_HTML_CHARS + 1);
+        return;
+      }
+    }
+    var remaining = $MAX_HTML_CHARS + 1 - html.length;
+    if (remaining > 0) html += doc.documentElement.outerHTML.slice(0, remaining);
+    if (depth >= 3) return;
+    var frames = doc.querySelectorAll('iframe, frame');
+    for (var i = 0; i < frames.length && theory === null; i++) {
       try {
-        html += collect(frames[i].contentDocument, depth + 1);
+        collect(frames[i].contentDocument, depth + 1);
       } catch (e) {}
     }
-    return html;
   }
-  return collect(document, 0);
+  collect(document, 0);
+  return theory === null ? html : theory;
+})()
+"""
+
+private const val REPAIR_HBVTC_DASHBOARD_HEIGHT_JS = """
+(function() {
+  var frame = document.getElementById('Frame0');
+  var container = document.getElementById('iframeClass');
+  var styleId = 'fallasleep-hbvtc-height';
+  if (!frame || !container || !document.head || document.getElementById(styleId)) return;
+  var style = document.createElement('style');
+  style.id = styleId;
+  document.head.appendChild(style);
+
+  function update() {
+    if (!style.textContent && frame.clientHeight > 1) return;
+    var height = Math.floor(window.innerHeight || document.documentElement.clientHeight);
+    var available = height - Math.ceil(container.getBoundingClientRect().top);
+    if (available <= 0) return;
+    var css = 'html, body, .new-main {height:' + height + 'px !important}' +
+        '#iframeClass {height:' + available + 'px !important}';
+    if (style.textContent !== css) style.textContent = css;
+  }
+  function afterLayout() { requestAnimationFrame(update); }
+  window.addEventListener('resize', afterLayout);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', afterLayout);
+  afterLayout();
+  setTimeout(afterLayout, 400);
 })()
 """
 
@@ -187,8 +233,6 @@ private fun autoFillCredentialsJs(account: String, password: String): String = "
   setValue(pwd, password);
 })()
 """
-
-private const val MAX_HTML_CHARS = 2_000_000
 
 /**
  * 不少教务系统（如正方 jsxsd）是 1200px 起的桌面布局，但页面自己写了
@@ -250,6 +294,17 @@ private fun normalizeWebUrl(input: String): String? {
     return candidate
 }
 
+internal fun hbvtcScheduleUrl(pageUrl: String?): String? {
+    val page = pageUrl?.let { runCatching { URI(it) }.getOrNull() } ?: return null
+    if (page.scheme !in listOf("http", "https") || page.userInfo != null ||
+        !"jwgl.hbvtc.edu.cn".equals(page.host, ignoreCase = true) ||
+        page.rawPath !in listOf("/jsxsd/framework/xsMainV.htmlx", "/jsxsd/framework/xsMainV_new.htmlx")
+    ) {
+        return null
+    }
+    return page.resolve("/jsxsd/xskb/xskb_list.do").toString()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EduImportScreen(
@@ -274,6 +329,7 @@ fun EduImportScreen(
     }
     var parsed by remember { mutableStateOf<EduParseResult?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var currentPageUrl by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var overwriteCurrent by rememberSaveable { mutableStateOf(false) }
@@ -298,22 +354,32 @@ fun EduImportScreen(
             settings.useWideViewPort = true
             settings.builtInZoomControls = true
             settings.displayZoomControls = false
-            // TODO: 排查白屏期间暂时放宽安全限制，确认原因后恢复严格配置。
-            settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-            settings.allowFileAccess = true
-            settings.allowContentAccess = true
-            settings.setAllowFileAccessFromFileURLs(true)
-            settings.setAllowUniversalAccessFromFileURLs(true)
-            settings.saveFormData = true
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            settings.setAllowFileAccessFromFileURLs(false)
+            settings.setAllowUniversalAccessFromFileURLs(false)
+            settings.saveFormData = false
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
             // 办事大厅一类门户用 window.open / target=_blank 打开教务系统。
             settings.setSupportMultipleWindows(true)
             settings.javaScriptCanOpenWindowsAutomatically = true
             webViewClient = object : WebViewClient() {
+                override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+                    currentPageUrl = url
+                }
+
+                override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+                    currentPageUrl = url
+                }
+
                 override fun onPageFinished(view: WebView, url: String) {
                     super.onPageFinished(view, url)
                     httpFallbackUrl = null
                     view.evaluateJavascript(FIT_WIDE_PAGE_JS, null)
+                    if (hbvtcScheduleUrl(url) != null) {
+                        view.evaluateJavascript(REPAIR_HBVTC_DASHBOARD_HEIGHT_JS, null)
+                    }
                     val host = runCatching { Uri.parse(url).host }.getOrNull()
                     val remember = context
                         .getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -674,6 +740,19 @@ fun EduImportScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = { openUrl() }) { Text("打开") }
+                }
+
+                hbvtcScheduleUrl(currentPageUrl)?.let { scheduleUrl ->
+                    TextButton(
+                        onClick = {
+                            httpFallbackUrl = null
+                            webView.loadUrl(scheduleUrl)
+                        },
+                        enabled = !loading,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    ) {
+                        Text("出现登陆后白屏问题？可能出现请求跨域拦截，点此打开学期理论课表")
+                    }
                 }
 
                 Row(

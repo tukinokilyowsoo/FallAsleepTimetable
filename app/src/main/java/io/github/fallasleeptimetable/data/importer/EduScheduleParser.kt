@@ -21,9 +21,13 @@ data class EduParseResult(
  * 只处理三种最常见的模板：
  * - 新版正方 jwglxt（#table1 + .festival/.title）
  * - 旧版正方（#Table1 + “第x节”文本）
- * - 强智（#kbtable + .kbcontent）
+ * - 强智（#kbtable 或 #timetable + .kbcontent）
  */
 object EduScheduleParser {
+    private val theoryPeriods = Regex("""[\[［]\s*(\d{1,2})(?:\s*[-–—~～至]\s*(\d{1,2}))?\s*节\s*[\]］]""")
+    private val weekLabel = Regex("""[（(]\s*周\s*[)）]""")
+    private val theorySeparator = Regex("-{5,}")
+
     fun parse(html: String, timetableName: String = "教务导入"): EduParseResult {
         require(html.isNotBlank()) { "页面内容为空" }
         val document = Jsoup.parse(html, "UTF-8")
@@ -53,7 +57,8 @@ object EduScheduleParser {
 
     private fun detect(document: Document): EduTemplate? {
         if (document.getElementById("kbtable") != null ||
-            document.getElementsByClass("kbcontent").isNotEmpty()
+            document.getElementsByClass("kbcontent").isNotEmpty() ||
+            document.select("table#timetable th").any { parseChineseDay(it.text()) != null }
         ) {
             return EduTemplate.QZ
         }
@@ -337,6 +342,10 @@ object EduScheduleParser {
     // ---------------------------------------------------------------- 强智
 
     private fun parseQz(document: Document): List<ImportedCourse> {
+        document.select("table#timetable").forEach { table ->
+            val courses = parseTheoryTimetable(table)
+            if (courses.isNotEmpty()) return courses
+        }
         val table = document.getElementById("kbtable") ?: return emptyList()
         val courses = mutableListOf<ImportedCourse>()
         var nodeCount = 0
@@ -359,6 +368,68 @@ object EduScheduleParser {
             }
         }
         return courses
+    }
+
+    private fun parseTheoryTimetable(table: Element): List<ImportedCourse> {
+        val rows = table.select("tr")
+        val days = mutableMapOf<Int, Int>()
+        for (row in rows) {
+            var column = 0
+            for (header in row.children().filter { it.normalName() == "th" }) {
+                parseChineseDay(header.text())?.let { days[column] = it }
+                column += header.attr("colspan").toIntOrNull()?.coerceAtLeast(1) ?: 1
+            }
+            if (days.isNotEmpty()) break
+        }
+
+        val courses = mutableListOf<ImportedCourse>()
+        for (row in rows) {
+            var column = 0
+            for (cell in row.children()) {
+                val day = days[column]
+                column += cell.attr("colspan").toIntOrNull()?.coerceAtLeast(1) ?: 1
+                if (day == null || cell.normalName() != "td") continue
+                for (content in cell.getElementsByClass("kbcontent")) {
+                    for (segment in content.html().split(theorySeparator)) {
+                        parseTheorySegment(segment, day)?.let(courses::add)
+                    }
+                }
+            }
+        }
+        return courses
+    }
+
+    private fun parseTheorySegment(html: String, day: Int): ImportedCourse? {
+        val segment = Jsoup.parseBodyFragment(html)
+        val schedule = segment.getElementsByAttributeValue("title", "周次(节次)").first()?.text()
+            ?: return null
+        val periods = theoryPeriods.find(schedule) ?: return null
+        val start = periods.groupValues[1].toInt()
+        val end = periods.groupValues[2].toIntOrNull() ?: start
+        if (start !in 1..30 || end !in start..30) return null
+
+        val name = segment.selectFirst("font")?.text()?.trim()?.takeIf { it.isNotBlank() }
+            ?: return null
+        val teacher = segment.selectFirst("[title=教师], [title=老师]")?.text()?.takeIf { it.isNotBlank() }
+        val room = segment.getElementsByAttributeValue("title", "教室").first()?.text()
+            ?.takeIf { it.isNotBlank() }
+        val weekText = schedule.substring(0, periods.range.first)
+            .replace(weekLabel, "")
+            .replace(Regex("[-–—~～至]"), "-")
+            .replace('、', ',')
+        val sessions = parseWeeks(weekText).mapNotNull { (first, last, parity) ->
+            if (first !in 1..60 || last !in first..60) return@mapNotNull null
+            ImportedSession(
+                dayOfWeek = day,
+                startPeriod = start,
+                periodCount = end - start + 1,
+                startWeek = first,
+                endWeek = last,
+                parity = parity,
+                room = room,
+            )
+        }
+        return sessions.takeIf { it.isNotEmpty() }?.let { ImportedCourse(name, teacher, colorFor(name), it) }
     }
 
     private fun parseQzSegment(

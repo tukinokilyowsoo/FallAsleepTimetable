@@ -9,6 +9,7 @@ val releaseStoreFile = providers.gradleProperty("FALLASLEEP_STORE_FILE").orNull
 val releaseStorePassword = providers.gradleProperty("FALLASLEEP_STORE_PASSWORD").orNull
 val releaseKeyAlias = providers.gradleProperty("FALLASLEEP_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.gradleProperty("FALLASLEEP_KEY_PASSWORD").orNull
+val previewRelease = providers.gradleProperty("FALLASLEEP_PREVIEW").orNull == "true"
 val hasReleaseSigning = releaseStoreFile != null &&
     releaseStorePassword != null &&
     releaseKeyAlias != null &&
@@ -22,11 +23,12 @@ android {
         applicationId = "io.github.tukinokilyowsoo.fallasleeptimetable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 28
-        versionName = "1.2.1"
+        versionCode = 29
+        versionName = "1.2.2"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
+            if (previewRelease) abiFilters += listOf("x86_64")
         }
     }
 
@@ -48,7 +50,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            if (hasReleaseSigning) {
+            if (previewRelease) {
+                applicationIdSuffix = ".hbvtcfix"
+                versionNameSuffix = "-beta1"
+                resValue("string", "app_name", "FallAsleep 课表修复试用版")
+                signingConfig = signingConfigs.getByName("debug")
+            } else if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
