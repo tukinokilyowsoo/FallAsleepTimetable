@@ -23,7 +23,7 @@ Done with splash ads! Done with shake-to-jump! Done with over-designed screens! 
 
 So here it is: a completely offline, featherweight, ad-free, absolutely free, long-term-maintained Material You timetable!
 
-> Current version: **v1.2.1** · Android 8.0+ · arm64-v8a
+> Current version: **v1.2.2** · Android 8.0+ · arm64-v8a
 
 ## Tomo says: use FallAsleep Timetable!
 
@@ -92,7 +92,7 @@ Settings → Data:
 
 Stable releases live in [Releases](https://github.com/tukinokilyowsoo/FallAsleepTimetable/releases/latest):
 
-- File: `FallAsleepTimetable_arm64_v1.2.1.apk`
+- File: `FallAsleepTimetable_arm64_v1.2.2.apk`
 - Architecture: arm64-v8a (most recent phones and tablets)
 - Size: about 10.5 MB
 - SHA-256: `dc636c6b510970d78fff39aea331a255a8ad283b36a7c33c40aa6a982f170e28`
@@ -148,6 +148,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 ## Development & docs
 
 - [M0 notes](docs/M0-记录.md) / [M1 notes](docs/M1-记录.md) / [M2 notes](docs/M2-记录.md) / [M3 notes](docs/M3-记录.md)
+- [v1.2.2 release notes](docs/RELEASE-NOTES-v1.2.2.md)
 - [v1.2.1 release notes](docs/RELEASE-NOTES-v1.2.1.md)
 - [v1.2.0 release notes](docs/RELEASE-NOTES-v1.2.0.md)
 - [v1.1.0 release notes](docs/RELEASE-NOTES-v1.1.0.md)

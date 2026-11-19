@@ -23,7 +23,7 @@
 
 というわけで、完全オフライン・超軽量・広告なし・完全無料・長期メンテの Material You 時間割ができました！
 
-> 現在のバージョン：**v1.2.1** · Android 8.0+ · arm64-v8a
+> 現在のバージョン：**v1.2.2** · Android 8.0+ · arm64-v8a
 
 ## Tomo のおすすめは FallAsleep 時間割！
 
@@ -92,7 +92,7 @@
 
 安定版は [Releases](https://github.com/tukinokilyowsoo/FallAsleepTimetable/releases/latest) で公開しています：
 
-- ファイル：`FallAsleepTimetable_arm64_v1.2.1.apk`
+- ファイル：`FallAsleepTimetable_arm64_v1.2.2.apk`
 - アーキテクチャ：arm64-v8a（最近のスマホ・タブレットのほとんど）
 - サイズ：約 10.5 MB
 - SHA-256：`dc636c6b510970d78fff39aea331a255a8ad283b36a7c33c40aa6a982f170e28`
@@ -148,6 +148,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 ## 開発とドキュメント
 
 - [M0 記録](docs/M0-记录.md) / [M1 記録](docs/M1-记录.md) / [M2 記録](docs/M2-记录.md) / [M3 記録](docs/M3-记录.md)
+- [v1.2.2 リリースノート](docs/RELEASE-NOTES-v1.2.2.md)
 - [v1.2.1 リリースノート](docs/RELEASE-NOTES-v1.2.1.md)
 - [v1.2.0 リリースノート](docs/RELEASE-NOTES-v1.2.0.md)
 - [v1.1.0 リリースノート](docs/RELEASE-NOTES-v1.1.0.md)

@@ -17,6 +17,7 @@ import android.webkit.SslErrorHandler
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -196,32 +197,37 @@ private const val REPAIR_HBVTC_DASHBOARD_HEIGHT_JS = """
 })()
 """
 
-/** 登录页自动填充：只在可见的密码框存在时填写，且不覆盖用户已输入的内容。 */
-private fun autoFillCredentialsJs(account: String, password: String): String = """
+/** 只向当前网站的可见登录表单填入未填写的字段。 */
+private fun fillCredentialsJs(host: String, account: String, password: String): String = """
 (function() {
+  if (location.hostname.toLowerCase() !== ${JSONObject.quote(host.lowercase())}) return 'page_changed';
   var account = ${JSONObject.quote(account)};
   var password = ${JSONObject.quote(password)};
   function visible(el) {
-    return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+    return !!(el && el.getClientRects().length && getComputedStyle(el).visibility === 'visible');
   }
-  function writable(el) {
-    return el && !el.value && !el.disabled && !el.readOnly;
+  function editable(el) {
+    return visible(el) && !el.disabled && !el.readOnly;
   }
   var pwd = null;
+  var hasPassword = false;
   var pwds = document.querySelectorAll('input[type="password"]');
   for (var i = 0; i < pwds.length; i++) {
-    if (visible(pwds[i]) && writable(pwds[i])) { pwd = pwds[i]; break; }
+    if (!editable(pwds[i])) continue;
+    if (!pwds[i].value) { pwd = pwds[i]; break; }
+    hasPassword = true;
   }
-  if (!pwd) return;
+  if (!pwd) return hasPassword ? 'already_filled' : 'no_password_field';
   var form = pwd.form || document;
-  var user = form.querySelector('#userAccount, #username, input[name="userAccount"], input[name="username"], input[name="account"]');
-  if (!writable(user)) {
+  var user = form.querySelector('input#userAccount, input#username, input[name="userAccount"], input[name="username"], input[name="account"]');
+  if (!editable(user)) {
     user = null;
-    var inputs = form.querySelectorAll('input[type="text"], input[type="tel"], input:not([type])');
+    var inputs = form.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input:not([type])');
     for (var j = 0; j < inputs.length; j++) {
-      if (visible(inputs[j]) && writable(inputs[j])) { user = inputs[j]; break; }
+      if (editable(inputs[j]) && !inputs[j].value) { user = inputs[j]; break; }
     }
   }
+  if (user && user.value && user.value.trim() !== account.trim()) return 'account_mismatch';
   function setValue(el, value) {
     var proto = Object.getPrototypeOf(el);
     var desc = Object.getOwnPropertyDescriptor(proto, 'value');
@@ -229,8 +235,9 @@ private fun autoFillCredentialsJs(account: String, password: String): String = "
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
-  if (user) setValue(user, account);
+  if (user && !user.value) setValue(user, account);
   setValue(pwd, password);
+  return 'filled';
 })()
 """
 
@@ -387,7 +394,8 @@ fun EduImportScreen(
                     if (remember && !host.isNullOrBlank()) {
                         EduCredentialStore.load(context, host)?.let { credentials ->
                             view.evaluateJavascript(
-                                autoFillCredentialsJs(
+                                fillCredentialsJs(
+                                    host,
                                     credentials.account,
                                     credentials.password,
                                 ),
@@ -575,6 +583,27 @@ fun EduImportScreen(
             prefs.edit().putBoolean("edu_remember_password", true).apply()
         } else {
             showCredentialDialog = true
+        }
+    }
+
+    fun fillRememberedPassword() {
+        val host = webView.url?.let(Uri::parse)?.host
+        val credentials = host?.let { EduCredentialStore.load(context, it) }
+        if (host.isNullOrBlank() || credentials == null) {
+            Toast.makeText(context, "当前网站没有保存的密码", Toast.LENGTH_SHORT).show()
+            return
+        }
+        webView.evaluateJavascript(
+            fillCredentialsJs(host, credentials.account, credentials.password),
+        ) { result ->
+            val message = when (result) {
+                "\"filled\"" -> "已填入密码"
+                "\"already_filled\"" -> "密码框已有内容"
+                "\"no_password_field\"" -> "请先打开登录表单"
+                "\"account_mismatch\"" -> "登录账号与保存的账号不同"
+                else -> "页面已切换，请重试"
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -768,7 +797,7 @@ fun EduImportScreen(
                         )
                         Text(
                             text = if (rememberPassword) {
-                                "已保存在本机，登录页会自动填入"
+                                "已开启自动填入"
                             } else {
                                 "仅保存在本机，使用系统密钥加密"
                             },
@@ -777,6 +806,7 @@ fun EduImportScreen(
                         )
                     }
                     if (rememberPassword) {
+                        TextButton(onClick = ::fillRememberedPassword) { Text("填入密码") }
                         TextButton(
                             onClick = {
                                 if (currentHost() == null) {
@@ -871,7 +901,7 @@ fun EduImportScreen(
                         prefs.edit().putBoolean("edu_remember_password", true).apply()
                         showCredentialDialog = false
                         webView.evaluateJavascript(
-                            autoFillCredentialsJs(account, password),
+                            fillCredentialsJs(targetHost, account, password),
                             null,
                         )
                     }

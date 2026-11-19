@@ -23,7 +23,7 @@
 
 于是乎就有了这个完全离线、超轻量、无广告、完全免费、长期维护的 Material You 课程表！
 
-> 当前版本：**v1.2.1** · Android 8.0+ · arm64-v8a
+> 当前版本：**v1.2.2** · Android 8.0+ · arm64-v8a
 
 ## Tomo 推荐使用 FallAsleep 课程表！
 
@@ -88,7 +88,7 @@
 
 正式版发布于 [Releases](https://github.com/tukinokilyowsoo/FallAsleepTimetable/releases/latest)：
 
-- 文件：`FallAsleepTimetable_arm64_v1.2.1.apk`
+- 文件：`FallAsleepTimetable_arm64_v1.2.2.apk`
 - 架构：arm64-v8a（绝大多数近年的手机与平板）
 - 大小：约 10.5 MB
 - SHA-256：`dc636c6b510970d78fff39aea331a255a8ad283b36a7c33c40aa6a982f170e28`
@@ -143,6 +143,7 @@ app/src/main/java/io/github/fallasleeptimetable/
 ## 开发与文档
 
 - [M0 记录](docs/M0-记录.md) / [M1 记录](docs/M1-记录.md) / [M2 记录](docs/M2-记录.md) / [M3 记录](docs/M3-记录.md)
+- [v1.2.2 正式版说明](docs/RELEASE-NOTES-v1.2.2.md)
 - [v1.2.1 正式版说明](docs/RELEASE-NOTES-v1.2.1.md)
 - [v1.2.0 正式版说明](docs/RELEASE-NOTES-v1.2.0.md)
 - [v1.1.0 正式版说明](docs/RELEASE-NOTES-v1.1.0.md)
